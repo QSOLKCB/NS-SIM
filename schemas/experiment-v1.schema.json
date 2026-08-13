@@ -119,5 +119,15 @@
       "type": "object", "additionalProperties": false, "required": ["target"],
       "properties": {"target": {"enum": ["R1", "R2"]}}
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"domain": {"properties": {"units": {"const": "nondimensional"}}}}},
+      "then": {"properties": {"material": {"properties": {"units": {"const": "nondimensional"}}}}}
+    },
+    {
+      "if": {"properties": {"domain": {"properties": {"units": {"const": "m"}}}}},
+      "then": {"properties": {"material": {"properties": {"units": {"const": "SI"}}}}}
+    }
+  ]
 }
