@@ -29,6 +29,29 @@ backend_request
 reproducibility_policy
 ```
 
+## Forcing semantics
+
+For the canonical incompressible model, the momentum equation uses `f` as a **specific body-force acceleration** with dimensional units `L/T²`.
+
+A forcing input must therefore declare at least:
+
+```text
+forcing.representation
+forcing.units_or_nondimensional_convention
+forcing.value_or_generator
+```
+
+Supported representations may include:
+
+```text
+specific_body_force_acceleration
+force_density
+```
+
+If `force_density` is supplied, the canonical normalization must convert it to specific acceleration using `f = b/rho`, after checking units and density semantics. That conversion is part of the semantic experiment contract and must affect the normalized experiment identity when its inputs differ.
+
+No implementation may interpret an unqualified forcing field sometimes as acceleration and sometimes as force density.
+
 ## Schema rules
 
 - Units or nondimensional conventions must be explicit.
@@ -43,6 +66,10 @@ reproducibility_policy
 
 The normalized form used for hashing should be machine-readable, deterministic, and schema-versioned. It should not include ephemeral values such as timestamps, temporary paths, hostnames, or remote-job IDs unless those values actually alter simulation semantics.
 
+R0 classification applies to this normalized semantic contract and does not require execution provenance. Execution metadata is attached when a run occurs.
+
 ## Separation of experiment and execution metadata
 
 Requested backend may be part of the experiment/run request, but discovered hardware identity, wall-clock timing, cost, remote host ID, and scheduler metadata belong in execution provenance rather than the physical model definition.
+
+A completed run receipt must preserve enough execution provenance to support any claimed R1–R4 classification even though those fields are not part of the R0 semantic experiment identity.
