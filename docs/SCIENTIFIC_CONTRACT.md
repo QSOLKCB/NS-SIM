@@ -6,12 +6,14 @@ The first NS-SIM scientific target is a finite-dimensional numerical approximati
 
 ## Governing continuum model
 
-For velocity `u(x,t)`, pressure `p(x,t)`, density `rho`, kinematic viscosity `nu`, and body force `f`:
+For velocity `u(x,t)`, pressure `p(x,t)`, density `rho`, kinematic viscosity `nu`, and specific body-force acceleration `f`:
 
 ```text
 ∂u/∂t + (u·∇)u = -(1/rho)∇p + nu∇²u + f
 ∇·u = 0
 ```
+
+In dimensional form, `f` is force per unit mass and therefore has units of acceleration (`L/T²`). If a source supplies a force density `b` (force per unit volume), the corresponding term is `b/rho`. Experiment inputs must explicitly identify which forcing representation is supplied, together with units or a nondimensional convention. The canonical incompressible contract normalizes forcing to the specific-acceleration form used above.
 
 A numerical run approximates this model under a declared domain, discretization, initial condition, boundary condition, timestep policy, pressure treatment, precision, and tolerance set.
 
@@ -25,7 +27,7 @@ A scientifically complete experiment must declare or inherit from a versioned pr
 - density and viscosity or nondimensional equivalents;
 - initial condition;
 - boundary conditions;
-- forcing;
+- forcing representation, units/nondimensional convention, and normalized forcing semantics;
 - spatial discretization;
 - pressure/projection method;
 - time integrator;
@@ -42,11 +44,19 @@ The discrete divergence is generally not mathematically zero in floating-point a
 
 ## Pressure
 
-Pressure may have a gauge freedom depending on formulation and boundary conditions. Validation must compare pressure in a gauge-consistent way or compare gauge-invariant quantities.
+Pressure may have a gauge freedom depending on formulation and boundary conditions. Numerical verification or physical validation must compare pressure in a gauge-consistent way or compare gauge-invariant quantities.
 
 ## Numerical validity
 
 A run is invalid if required solver convergence fails, canonical state becomes non-finite, hard timestep admissibility is violated, required constraints exceed configured failure tolerances, or the experiment contract is malformed.
+
+## Verification and validation boundary
+
+Numerical **verification** asks whether the implementation solves the declared mathematical/discrete problem consistently. Analytic solutions, manufactured solutions, refinement studies, numerical benchmark comparisons, residual checks, and backend-vs-reference comparisons are verification evidence.
+
+Physical **validation** asks whether the modeled equations and parameterization represent a physical system adequately for a stated purpose and regime. A positive validation claim requires comparison to experimental or observational evidence with the physical mapping, measurement uncertainty, comparison metric, and acceptance criterion declared.
+
+Verification evidence must not be relabeled as physical validation merely because a benchmark is well established.
 
 ## Extension rule
 
