@@ -1,0 +1,30 @@
+{
+  "schema_version": "ns-sim-experiment/1",
+  "experiment_name": "phase1-periodic-vortex-smoke",
+  "model": {"name": "incompressible-navier-stokes-2d", "version": "1"},
+  "domain": {"x_length": 6.283185307179586, "y_length": 6.283185307179586, "units": "nondimensional"},
+  "grid": {"nx": 16, "ny": 16, "layout": "cell-centered-uniform"},
+  "material": {"rho": 1.0, "nu": 0.01, "units": "nondimensional"},
+  "initial_condition": {"type": "taylor_green", "amplitude": 0.1, "mode": 1},
+  "boundary_conditions": {"x": "periodic", "y": "periodic"},
+  "forcing": {
+    "representation": "specific_body_force_acceleration",
+    "units_or_nondimensional_convention": "nondimensional",
+    "value": [0.0, 0.0]
+  },
+  "discretization": {
+    "name": "finite_difference_projection_v1",
+    "advection": "centered_second_order",
+    "diffusion": "centered_second_order",
+    "divergence_gradient_pair": "backward_forward_v1"
+  },
+  "time_integration": {"name": "forward_euler_projection_v1"},
+  "timestep_policy": {"type": "fixed", "dt": 0.002, "max_advective_cfl": 0.8, "max_diffusion_number": 0.5},
+  "solver": {"pressure": {"method": "jacobi_periodic_v1", "tolerance": 1e-10, "max_iterations": 5000}},
+  "precision": {"dtype": "float64", "byte_order": "little"},
+  "stopping_condition": {"steps": 4},
+  "diagnostics": {"interval": 1},
+  "checkpoint_policy": {"interval": 2, "include_initial": true, "include_final": true},
+  "backend_request": {"name": "cpu-reference-v1"},
+  "reproducibility_policy": {"target": "R2"}
+}
