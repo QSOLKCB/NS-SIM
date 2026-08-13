@@ -2,110 +2,80 @@
 
 **Deterministic, reproducible fluid-dynamics simulation runtime for Navier–Stokes research, numerical verification, physical validation, GPU acceleration, visualization, and sonification.**
 
-> Status: private pre-alpha research project. Interfaces, numerical methods, and reproducibility contracts may change before the first stable release.
+> Status: private pre-alpha research project. Phase 1 implements the canonical 2D CPU reference runtime. The Phase 2 numerical-verification suite is not yet complete, and no physical-validation claim is made.
 
 ## Purpose
 
-NS-SIM is intended to make numerical fluid-dynamics experiments reproducible as complete computational objects: equations, discretization, grid, boundary conditions, initial conditions, timestep policy, solver configuration, backend, precision, diagnostics, checkpoints, and provenance are all part of the run contract.
-
-The first implementation target is a deterministic reference runtime for **two-dimensional incompressible Navier–Stokes flow**, followed by accelerated CUDA backends and later three-dimensional work.
+NS-SIM treats a numerical fluid-dynamics run as a reproducible computational object: equations, discretization, grid, boundary conditions, initial conditions, timestep policy, solver configuration, backend, precision, diagnostics, checkpoints, hashes, and execution provenance are explicit parts of the contract.
 
 NS-SIM is not a claim to solve the mathematical Navier–Stokes existence-and-smoothness problem, is not a safety-certified engineering CFD package, and must not present numerical output as exact continuum truth.
 
-## Initial mathematical target
+## Phase 1 runtime
 
-For velocity field `u`, pressure `p`, density `rho`, kinematic viscosity `nu`, and specific body-force acceleration `f`:
+Phase 1 provides a working reference implementation for **two-dimensional incompressible Navier–Stokes flow** on a uniform cell-centered periodic grid.
+
+The implemented continuum target is
 
 ```text
 ∂u/∂t + (u·∇)u = -(1/rho)∇p + nu∇²u + f
 ∇·u = 0
 ```
 
-In dimensional form, `f` has units of acceleration (`L/T²`) and is force per unit mass. If an input is instead supplied as force density `b` (force per unit volume), its momentum-equation contribution is `b/rho`; the representation and units must be explicit and normalization to the canonical acceleration form is part of the experiment contract.
+where `f` is specific body-force acceleration. Force-density input is accepted only when explicitly identified and is normalized through `f = b/rho`.
 
-The initial reference solver is planned around a documented projection method with explicit discretization, pressure solve, boundary treatment, timestep policy, and convergence criteria.
+The `cpu-reference-v1` numerical contract currently fixes float64 canonical state, little-endian serialization, uniform cell-centered rectangular grids, periodic x/y boundaries, centered second-order advection/diffusion, a backward-divergence/forward-gradient projection pair, forward-Euler stepping, a mean-zero pressure gauge, deterministic Jacobi pressure iteration, and fail-closed timestep/convergence checks.
 
-## Design principles
+This is deliberately narrow. No-slip walls, obstacles, alternate pressure solvers, CUDA, 3D, and benchmark tolerances belong to later versioned contracts.
 
-1. **Reference before acceleration.** A canonical CPU implementation establishes the numerical contract before GPU optimization.
-2. **Configuration is part of the result.** A result without its complete experiment configuration is incomplete.
-3. **Receipts over screenshots.** Runs should emit machine-verifiable provenance, hashes, diagnostics, and checkpoint metadata alongside visual output.
-4. **Determinism is qualified.** Bitwise reproducibility, backend-local reproducibility, and tolerance-based cross-device reproducibility are different claims and must be reported separately.
-5. **Verification before spectacle.** Analytic-reference, refinement, and benchmark cases precede large turbulence runs. Physical-validation claims require separate physical evidence.
-6. **No hidden physics.** Numerical stabilizers, filtering, forcing, clipping, precision changes, and backend-specific behavior must be declared.
-7. **Visualization and sonification are derived views.** They may represent the simulation but never redefine its canonical state.
+## Install
 
-## Planned evidence suite
-
-The initial suite is primarily a **numerical verification** suite:
-
-- Taylor–Green vortex
-- Plane Poiseuille/channel flow
-- Lid-driven cavity
-- Cylinder wake / vortex shedding
-
-Each case should define its evidence type, reference source, expected diagnostics, acceptable error metrics, grid/time refinement expectations, and reproducibility requirements. A comparison against experimental or observational data counts as physical validation only when the physical mapping, measurement uncertainty, and acceptance criteria are documented.
-
-## Reproducibility model
-
-NS-SIM distinguishes several classes of reproducibility:
-
-- **R0 — Contract reproducible:** the normalized semantic experiment contract is fully specified and stably identified. Execution provenance is not required at R0 because no execution need have occurred.
-- **R1 — Initial-state reproducible:** canonical CPU initialization under a declared initialization environment reproduces the same serialized initial state and identity hash. The environment includes backend, precision, software/runtime or container identity, and serialization version, plus hardware identity when it can affect initialization.
-- **R2 — Backend-local bitwise reproducible:** repeated runs match bit-for-bit under a declared backend/device/software environment.
-- **R3 — Cross-backend numerically reproducible:** results agree within declared norms and tolerances.
-- **R4 — Canonical reference reproducible:** the supported CPU reference path reproduces the archival reference result under its pinned environment.
-
-R0 identifies an experiment contract, not an executed run. Completed-run receipts require execution provenance independently of whether the experiment qualifies for R0.
-
-A GPU result must never be promoted from numerical agreement to bitwise equivalence without evidence.
-
-## Planned run receipt
-
-A canonical run receipt should identify at least:
-
-```text
-schema_version
-run_id
-experiment_hash
-solver_contract
-source_revision
-backend
-hardware
-precision
-software_environment
-initial_state_hash
-checkpoint_hashes
-final_state_hash
-diagnostics
-verification_result
-validation_status
+```bash
+python -m pip install -e '.[test]'
 ```
 
-`validation_status` may be `not_claimed` when no physical-validation evidence applies. A positive physical-validation claim requires a separately identified validation reference and uncertainty/tolerance contract.
+Python 3.11+ and NumPy are required.
 
-## Planned repository layout
+## Run
+
+```bash
+ns-sim normalize examples/phase1-periodic-vortex.json
+ns-sim run examples/phase1-periodic-vortex.json --output runs/example
+ns-sim verify-repeat examples/phase1-periodic-vortex.json --output runs/repeat-check
+```
+
+A single execution may demonstrate R0/R1. `verify-repeat` reports R2 only after two executions match in the same declared environment. R3 requires a future cross-backend comparison; R4 requires an archived pinned reference result.
+
+## Phase 1 artifacts
+
+A successful run emits normalized and identity experiment JSON, a provenance-bearing `receipt.json`, and versioned `.nss` checkpoints. Semantic binary64 values are represented exactly for experiment hashing, and canonical state/checkpoint hashes use SHA-256 over the declared `ns-sim-state/1` byte format.
+
+Diagnostics include finite-state status, discrete divergence L∞/L2, pressure residual/iterations, advective CFL, diffusion number, kinetic energy, enstrophy, and maximum velocity components.
+
+Malformed contracts, unknown fields, unsupported combinations, non-finite state, declared timestep-limit violations, and pressure non-convergence terminate the run instead of producing a plausible-looking success receipt.
+
+## Verification and validation boundary
+
+Phase 1 includes regression and invariant tests for runtime behavior. Those tests are **not** the Phase 2 numerical-verification suite and are not physical validation.
+
+The planned Phase 2 evidence suite includes Taylor–Green vortex, plane Poiseuille/channel flow, lid-driven cavity, cylinder wake/vortex shedding, and refinement tooling. Physical-validation claims additionally require experimental/observational evidence, uncertainty, metrics, acceptance criteria, and declared scope.
+
+## Repository layout
 
 ```text
 NS-SIM/
-├── canonical/          # reference equations, discretizations, contracts
-├── runtime/            # execution, receipts, checkpoints, replay
-├── backends/           # CPU, CUDA, later multi-GPU implementations
-├── experiments/        # canonical benchmark and research configurations
-├── validation/         # verification and physical-validation evidence tooling
-├── viz/                # derived visualization tooling
-├── sonification/       # derived deterministic audio mappings
-├── formal/             # later formal specifications / assurance where useful
-├── containers/         # reproducible runtime environments
-└── docs/               # scientific and engineering documentation
+├── src/ns_sim/         # canonical Phase 1 runtime
+├── schemas/            # versioned experiment and receipt schemas
+├── examples/           # executable experiment contracts
+├── tests/              # software/runtime invariant regressions
+├── docs/               # scientific and engineering contracts
+└── .github/workflows/  # CI checks
 ```
-
-The layout is a target architecture, not a claim that these modules already exist.
 
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md)
 - [Scientific contract](docs/SCIENTIFIC_CONTRACT.md)
+- [Phase 1 runtime contract](docs/PHASE1_RUNTIME.md)
 - [Determinism and reproducibility](docs/DETERMINISM.md)
 - [Verification and validation policy](docs/VALIDATION.md)
 - [Experiment schema](docs/EXPERIMENT_SCHEMA.md)
