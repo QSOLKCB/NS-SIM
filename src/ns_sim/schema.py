@@ -213,7 +213,7 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
     elif representation == "force_density" and units != "N/m^3":
         raise ConfigurationError("SI force density must use 'N/m^3'")
     if representation == "specific_body_force_acceleration":
-        canonical_value = input_value
+        canonical_value = list(input_value)
         canonical_units = "nondimensional" if material_units == "nondimensional" else "m/s^2"
     elif representation == "force_density":
         canonical_value = [input_value[0] / rho, input_value[1] / rho]
@@ -303,10 +303,10 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
         "forcing": {
             "input_representation": representation,
             "input_units": units,
-            "input_value": input_value,
+            "input_value": list(input_value),
             "canonical_representation": "specific_body_force_acceleration",
             "canonical_units": canonical_units,
-            "canonical_value": canonical_value,
+            "canonical_value": list(canonical_value),
         },
         "discretization": expected_discretization,
         "time_integration": {"name": "forward_euler_projection_v1"},
