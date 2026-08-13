@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSOLKCB/NS-SIM/schemas/receipt-v1.schema.json",
+  "title": "NS-SIM Phase 1 Run Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "run_status", "ns_sim_version", "source_revision",
+    "experiment_name", "experiment_hash", "model", "backend", "reproducibility",
+    "initial_state_hash", "final_state_hash", "checkpoint_hashes", "diagnostics",
+    "numerical_verification_status", "physical_validation_status"
+  ],
+  "properties": {
+    "schema_version": {"const": "ns-sim-receipt/1"},
+    "run_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "run_status": {"const": "completed"},
+    "ns_sim_version": {"type": "string"},
+    "source_revision": {"type": "string"},
+    "experiment_name": {"type": "string"},
+    "experiment_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "model": {"type": "object"},
+    "backend": {"type": "object"},
+    "reproducibility": {"type": "object"},
+    "initial_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "final_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "checkpoint_hashes": {"type": "array", "items": {"type": "object"}},
+    "diagnostics": {"type": "array", "items": {"type": "object"}},
+    "numerical_verification_status": {"type": "string"},
+    "physical_validation_status": {"type": "string"}
+  }
+}

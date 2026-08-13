@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSOLKCB/NS-SIM/schemas/experiment-v1.schema.json",
+  "title": "NS-SIM Phase 1 Experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "experiment_name", "model", "domain", "grid", "material",
+    "initial_condition", "boundary_conditions", "forcing", "discretization",
+    "time_integration", "timestep_policy", "solver", "precision", "stopping_condition",
+    "diagnostics", "checkpoint_policy", "backend_request", "reproducibility_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": "ns-sim-experiment/1"},
+    "experiment_name": {"type": "string", "minLength": 1},
+    "model": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version"],
+      "properties": {"name": {"const": "incompressible-navier-stokes-2d"}, "version": {"const": "1"}}
+    },
+    "domain": {
+      "type": "object", "additionalProperties": false, "required": ["x_length", "y_length", "units"],
+      "properties": {
+        "x_length": {"type": "number", "exclusiveMinimum": 0},
+        "y_length": {"type": "number", "exclusiveMinimum": 0},
+        "units": {"enum": ["nondimensional", "m"]}
+      }
+    },
+    "grid": {
+      "type": "object", "additionalProperties": false, "required": ["nx", "ny", "layout"],
+      "properties": {
+        "nx": {"type": "integer", "minimum": 8}, "ny": {"type": "integer", "minimum": 8},
+        "layout": {"const": "cell-centered-uniform"}
+      }
+    },
+    "material": {
+      "type": "object", "additionalProperties": false, "required": ["rho", "nu", "units"],
+      "properties": {
+        "rho": {"type": "number", "exclusiveMinimum": 0}, "nu": {"type": "number", "minimum": 0},
+        "units": {"enum": ["nondimensional", "SI"]}
+      }
+    },
+    "initial_condition": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "zero"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "amplitude", "mode"], "properties": {
+          "type": {"const": "taylor_green"}, "amplitude": {"type": "number", "minimum": 0}, "mode": {"type": "integer", "minimum": 1}
+        }}
+      ]
+    },
+    "boundary_conditions": {
+      "type": "object", "additionalProperties": false, "required": ["x", "y"],
+      "properties": {"x": {"const": "periodic"}, "y": {"const": "periodic"}}
+    },
+    "forcing": {
+      "type": "object", "additionalProperties": false,
+      "required": ["representation", "units_or_nondimensional_convention", "value"],
+      "properties": {
+        "representation": {"enum": ["specific_body_force_acceleration", "force_density"]},
+        "units_or_nondimensional_convention": {"type": "string", "minLength": 1},
+        "value": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}
+      }
+    },
+    "discretization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "advection", "diffusion", "divergence_gradient_pair"],
+      "properties": {
+        "name": {"const": "finite_difference_projection_v1"},
+        "advection": {"const": "centered_second_order"},
+        "diffusion": {"const": "centered_second_order"},
+        "divergence_gradient_pair": {"const": "backward_forward_v1"}
+      }
+    },
+    "time_integration": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": {"name": {"const": "forward_euler_projection_v1"}}
+    },
+    "timestep_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "dt", "max_advective_cfl", "max_diffusion_number"],
+      "properties": {
+        "type": {"const": "fixed"}, "dt": {"type": "number", "exclusiveMinimum": 0},
+        "max_advective_cfl": {"type": "number", "exclusiveMinimum": 0},
+        "max_diffusion_number": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "solver": {
+      "type": "object", "additionalProperties": false, "required": ["pressure"],
+      "properties": {"pressure": {
+        "type": "object", "additionalProperties": false, "required": ["method", "tolerance", "max_iterations"],
+        "properties": {
+          "method": {"const": "jacobi_periodic_v1"}, "tolerance": {"type": "number", "exclusiveMinimum": 0},
+          "max_iterations": {"type": "integer", "minimum": 1}
+        }
+      }}
+    },
+    "precision": {
+      "type": "object", "additionalProperties": false, "required": ["dtype", "byte_order"],
+      "properties": {"dtype": {"const": "float64"}, "byte_order": {"const": "little"}}
+    },
+    "stopping_condition": {
+      "type": "object", "additionalProperties": false, "required": ["steps"],
+      "properties": {"steps": {"type": "integer", "minimum": 1}}
+    },
+    "diagnostics": {
+      "type": "object", "additionalProperties": false, "required": ["interval"],
+      "properties": {"interval": {"type": "integer", "minimum": 1}}
+    },
+    "checkpoint_policy": {
+      "type": "object", "additionalProperties": false, "required": ["interval", "include_initial", "include_final"],
+      "properties": {
+        "interval": {"type": "integer", "minimum": 1}, "include_initial": {"type": "boolean"}, "include_final": {"type": "boolean"}
+      }
+    },
+    "backend_request": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": {"name": {"const": "cpu-reference-v1"}}
+    },
+    "reproducibility_policy": {
+      "type": "object", "additionalProperties": false, "required": ["target"],
+      "properties": {"target": {"enum": ["R1", "R2"]}}
+    }
+  }
+}
