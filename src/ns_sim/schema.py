@@ -34,6 +34,16 @@ _TOP_LEVEL = {
     "reproducibility_policy",
 }
 
+_RAW_FORCING_FIELDS = {"representation", "units_or_nondimensional_convention", "value"}
+_NORMALIZED_FORCING_FIELDS = {
+    "input_representation",
+    "input_units",
+    "input_value",
+    "canonical_representation",
+    "canonical_units",
+    "canonical_value",
+}
+
 
 def _object(value: Any, path: str) -> dict[str, Any]:
     if not isinstance(value, dict):
@@ -54,7 +64,10 @@ def _strict(obj: dict[str, Any], allowed: set[str], path: str, required: set[str
 def _number(value: Any, path: str, *, minimum: float | None = None, positive: bool = False) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConfigurationError(f"{path} must be a finite number")
-    out = float(value)
+    try:
+        out = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise ConfigurationError(f"{path} must be representable as finite binary64") from exc
     if not math.isfinite(out):
         raise ConfigurationError(f"{path} must be finite")
     if positive and out <= 0.0:
@@ -101,15 +114,36 @@ def load_experiment(path: str | Path) -> dict[str, Any]:
     return normalize_experiment(raw)
 
 
+def _round_trip_normalized_experiment(top: dict[str, Any]) -> dict[str, Any] | None:
+    forcing = top.get("forcing")
+    if not isinstance(forcing, dict) or set(forcing) != _NORMALIZED_FORCING_FIELDS:
+        return None
+    raw = dict(top)
+    raw["forcing"] = {
+        "representation": forcing["input_representation"],
+        "units_or_nondimensional_convention": forcing["input_units"],
+        "value": forcing["input_value"],
+    }
+    normalized = normalize_experiment(raw)
+    if normalized != top:
+        raise ConfigurationError("normalized experiment is not in canonical normalized form")
+    return normalized
+
+
 def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
     top = _object(raw, "experiment")
     _strict(top, _TOP_LEVEL, "experiment")
+
+    already_normalized = _round_trip_normalized_experiment(top)
+    if already_normalized is not None:
+        return already_normalized
+
     if top["schema_version"] != SCHEMA_VERSION:
         raise ConfigurationError(f"schema_version must be {SCHEMA_VERSION!r}")
 
     model = _object(top["model"], "model")
     _strict(model, {"name", "version"}, "model")
-    if model["name"] != MODEL_NAME or str(model["version"]) != MODEL_VERSION:
+    if model["name"] != MODEL_NAME or model["version"] != MODEL_VERSION:
         raise ConfigurationError(f"Phase 1 supports model {MODEL_NAME!r} version {MODEL_VERSION!r} only")
 
     domain = _object(top["domain"], "domain")
@@ -129,8 +163,13 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
 
     material = _object(top["material"], "material")
     _strict(material, {"rho", "nu", "units"}, "material")
-    if material["units"] not in {"nondimensional", "SI"}:
+    material_units = material["units"]
+    if material_units not in {"nondimensional", "SI"}:
         raise ConfigurationError("material.units must be 'nondimensional' or 'SI'")
+    if (domain_units, material_units) not in {("nondimensional", "nondimensional"), ("m", "SI")}:
+        raise ConfigurationError(
+            "Phase 1 requires paired units: nondimensional domain/material or metre/SI domain/material"
+        )
     rho = _number(material["rho"], "material.rho", positive=True)
     nu = _number(material["nu"], "material.nu", minimum=0.0)
 
@@ -143,10 +182,15 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
         _strict(initial, {"type", "amplitude", "mode"}, "initial_condition")
         if not math.isclose(x_length, y_length, rel_tol=0.0, abs_tol=0.0):
             raise ConfigurationError("taylor_green initialization requires a square domain in Phase 1")
+        mode = _integer(initial["mode"], "initial_condition.mode", minimum=1)
+        if 2 * mode >= nx or 2 * mode >= ny:
+            raise ConfigurationError(
+                "initial_condition.mode must be strictly below the Nyquist limit of both grid dimensions"
+            )
         normalized_initial = {
             "type": "taylor_green",
             "amplitude": _number(initial["amplitude"], "initial_condition.amplitude", minimum=0.0),
-            "mode": _integer(initial["mode"], "initial_condition.mode", minimum=1),
+            "mode": mode,
         }
     else:
         raise ConfigurationError("initial_condition.type must be 'zero' or 'taylor_green'")
@@ -157,11 +201,11 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
         raise ConfigurationError("Phase 1 canonical backend supports periodic x/y boundaries only")
 
     forcing = _object(top["forcing"], "forcing")
-    _strict(forcing, {"representation", "units_or_nondimensional_convention", "value"}, "forcing")
+    _strict(forcing, _RAW_FORCING_FIELDS, "forcing")
     representation = forcing["representation"]
     units = forcing["units_or_nondimensional_convention"]
     input_value = _vector2(forcing["value"], "forcing.value")
-    if material["units"] == "nondimensional":
+    if material_units == "nondimensional":
         if units != "nondimensional":
             raise ConfigurationError("nondimensional material requires nondimensional forcing")
     elif representation == "specific_body_force_acceleration" and units != "m/s^2":
@@ -170,10 +214,10 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
         raise ConfigurationError("SI force density must use 'N/m^3'")
     if representation == "specific_body_force_acceleration":
         canonical_value = input_value
-        canonical_units = "nondimensional" if material["units"] == "nondimensional" else "m/s^2"
+        canonical_units = "nondimensional" if material_units == "nondimensional" else "m/s^2"
     elif representation == "force_density":
         canonical_value = [input_value[0] / rho, input_value[1] / rho]
-        canonical_units = "nondimensional" if material["units"] == "nondimensional" else "m/s^2"
+        canonical_units = "nondimensional" if material_units == "nondimensional" else "m/s^2"
     else:
         raise ConfigurationError(
             "forcing.representation must be 'specific_body_force_acceleration' or 'force_density'"
@@ -253,7 +297,7 @@ def normalize_experiment(raw: dict[str, Any]) -> dict[str, Any]:
         "model": {"name": MODEL_NAME, "version": MODEL_VERSION},
         "domain": {"x_length": x_length, "y_length": y_length, "units": domain_units},
         "grid": {"nx": nx, "ny": ny, "layout": "cell-centered-uniform"},
-        "material": {"rho": rho, "nu": nu, "units": material["units"]},
+        "material": {"rho": rho, "nu": nu, "units": material_units},
         "initial_condition": normalized_initial,
         "boundary_conditions": {"x": "periodic", "y": "periodic"},
         "forcing": {
