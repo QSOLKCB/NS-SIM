@@ -22,18 +22,20 @@ The roadmap is directional, not a release promise. Numerical verification and sc
 - deterministic state serialization, run receipts, and checkpoints;
 - finite-state, divergence, pressure-convergence, CFL, diffusion-number, energy, and enstrophy diagnostics;
 - R1 initialization check and explicit R2 repeat-execution verifier;
+- exact discrete shear-wave check for the diffusion operator plus Forward-Euler update;
+- Taylor–Green analytic comparison with coupled spatial/time refinement from 16² to 32² requiring reduced velocity-field error;
 - CI regression and canonical smoke run.
 
-Phase 1 does **not** complete the Phase 2 numerical-verification evidence suite.
+Phase 1 therefore includes minimum numerical-verification evidence for the canonical operator/time-step implementation. It does **not** claim the broader Phase 2 verification programme is complete.
 
-## Phase 2 — Numerical verification suite
+## Phase 2 — Expanded numerical verification suite
 
-- Taylor–Green vortex;
+- extend Taylor–Green to systematic grid/time refinement studies and archived tolerances;
 - Poiseuille/channel flow;
 - lid-driven cavity;
 - cylinder wake / vortex shedding;
-- grid/time refinement tooling;
-- archived reference outputs and tolerances.
+- reusable grid/time refinement tooling;
+- archived reference outputs, metrics, and tolerances.
 
 ## Phase 3 — CUDA acceleration
 
