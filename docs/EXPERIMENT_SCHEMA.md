@@ -2,11 +2,11 @@
 
 Phase 1 freezes the first executable experiment schema as JSON: `ns-sim-experiment/1`. Its machine-readable companion is [`schemas/experiment-v1.schema.json`](../schemas/experiment-v1.schema.json).
 
-The runtime performs strict semantic validation itself; the JSON Schema is an interoperability artifact and must remain consistent with the executable validator.
+The Python runtime performs strict semantic validation itself. The JSON Schema is an interoperability artifact and must remain consistent with the executable validator; it is not a substitute for the canonical normalization code.
 
 ## Required semantic groups
 
-Every Phase 1 experiment contains exactly these top-level groups:
+A Phase 1 experiment represents exactly these top-level semantic groups:
 
 ```text
 schema_version
@@ -30,9 +30,9 @@ backend_request
 reproducibility_policy
 ```
 
-Unknown fields fail closed.
+## Phase 1 fixed contract choices
 
-## Phase 1 fixed choices
+The first executable contract intentionally permits a narrow set of values:
 
 ```text
 schema_version                          ns-sim-experiment/1
@@ -51,24 +51,58 @@ precision.byte_order                    little
 backend_request.name                    cpu-reference-v1
 ```
 
-Unsupported alternatives are rejected rather than silently mapped onto these values.
+Unsupported alternatives fail validation rather than being silently coerced onto these semantics.
 
 ## Forcing semantics
 
-Canonical momentum forcing is specific body-force acceleration. Input must declare representation, units/nondimensional convention, and a two-component value. Supported representations are `specific_body_force_acceleration` and `force_density`.
+For the canonical incompressible model, the momentum equation uses `f` as a **specific body-force acceleration** with dimensional units `L/T²`.
 
-`force_density` is normalized via `f = b/rho`. The normalized experiment retains the input representation/value and canonical acceleration value, so the conversion remains explicit in the semantic identity.
+A forcing input declares:
 
-Phase 1 accepts a nondimensional convention or the narrow SI labels needed by implemented fields; it is not a general unit-conversion engine.
+```text
+forcing.representation
+forcing.units_or_nondimensional_convention
+forcing.value
+```
 
-## Canonical normalization and hashing
+Phase 1 accepts these representations:
 
-All result-affecting choices are explicit; Phase 1 does not hide semantic defaults. The canonical identity document is deterministic JSON with sorted keys and no insignificant whitespace. Binary64 semantic values are represented by exact hexadecimal strings inside `$float64` objects before SHA-256 hashing.
+```text
+specific_body_force_acceleration
+force_density
+```
 
-R0 applies to this normalized semantic contract and does not require execution provenance.
+If `force_density` is supplied, canonical normalization converts it to specific acceleration using `f = b/rho` after checking the declared density/unit convention. The normalized experiment preserves the input representation, input units, input value, canonical representation, canonical units, and canonical value. The conversion therefore remains visible and affects semantic identity when its inputs differ.
 
-## Experiment versus execution metadata
+No implementation may interpret an unqualified forcing field sometimes as acceleration and sometimes as force density.
 
-Requested backend is part of the experiment/run request. Discovered CPU identity, Python/NumPy versions, OS information, source revision, and other execution provenance belong in the receipt rather than the R0 experiment identity.
+Phase 1 accepts a narrow nondimensional convention and the implemented SI labels; it is not a general unit-conversion engine.
 
-See [`examples/phase1-periodic-vortex.json`](../examples/phase1-periodic-vortex.json). Its Taylor–Green initializer is a deterministic runtime exercise, not yet a Phase 2 verification claim.
+## Schema rules
+
+- Units or nondimensional conventions must be explicit.
+- Defaults that affect results must be versioned and visible after normalization; Phase 1 avoids hidden semantic defaults.
+- Unknown fields fail validation unless a future versioned extension mechanism explicitly allows them.
+- Ordering differences in source JSON must not create different canonical identities when semantics are identical.
+- Numeric serialization used for hashing is specified and versioned.
+- Paths included in the semantic contract must use portable, normalized rules when such fields are later introduced.
+- Secrets are forbidden.
+- Unsupported boundary, precision, backend, discretization, or solver values fail closed.
+
+## Canonical normalization
+
+The normalized form used for hashing is machine-readable, deterministic, and schema-versioned. It excludes ephemeral execution values such as timestamps, temporary paths, discovered hostnames, and remote-job IDs.
+
+For `ns-sim-experiment/1`, object keys are sorted and semantic binary64 values are represented by exact IEEE-754 hexadecimal strings wrapped as `$float64` objects before compact UTF-8 JSON serialization. SHA-256 of those bytes is `experiment_hash`.
+
+R0 classification applies to this normalized semantic contract and does not require execution provenance. Execution metadata is attached when a run occurs.
+
+## Separation of experiment and execution metadata
+
+Requested backend remains part of the experiment/run request, but discovered hardware identity, Python/NumPy versions, OS information, source revision, wall-clock timing, cost, remote host ID, and scheduler metadata belong in execution provenance rather than the physical model definition.
+
+A completed run receipt must preserve enough execution provenance to support any claimed R1–R4 classification even though those fields are not part of the R0 semantic experiment identity.
+
+## Example
+
+[`examples/phase1-periodic-vortex.json`](../examples/phase1-periodic-vortex.json) is an executable Phase 1 experiment contract. Its Taylor–Green initializer exercises deterministic initialization and projection; it is not by itself a Phase 2 Taylor–Green verification result.
