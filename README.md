@@ -1,6 +1,6 @@
 # NS-SIM
 
-**Deterministic, reproducible fluid-dynamics simulation runtime for Navier–Stokes research, validation, GPU acceleration, visualization, and sonification.**
+**Deterministic, reproducible fluid-dynamics simulation runtime for Navier–Stokes research, numerical verification, physical validation, GPU acceleration, visualization, and sonification.**
 
 > Status: private pre-alpha research project. Interfaces, numerical methods, and reproducibility contracts may change before the first stable release.
 
@@ -14,12 +14,14 @@ NS-SIM is not a claim to solve the mathematical Navier–Stokes existence-and-sm
 
 ## Initial mathematical target
 
-For velocity field `u`, pressure `p`, density `rho`, kinematic viscosity `nu`, and forcing `f`:
+For velocity field `u`, pressure `p`, density `rho`, kinematic viscosity `nu`, and specific body-force acceleration `f`:
 
 ```text
 ∂u/∂t + (u·∇)u = -(1/rho)∇p + nu∇²u + f
 ∇·u = 0
 ```
+
+In dimensional form, `f` has units of acceleration (`L/T²`) and is force per unit mass. If an input is instead supplied as force density `b` (force per unit volume), its momentum-equation contribution is `b/rho`; the representation and units must be explicit and normalization to the canonical acceleration form is part of the experiment contract.
 
 The initial reference solver is planned around a documented projection method with explicit discretization, pressure solve, boundary treatment, timestep policy, and convergence criteria.
 
@@ -29,28 +31,32 @@ The initial reference solver is planned around a documented projection method wi
 2. **Configuration is part of the result.** A result without its complete experiment configuration is incomplete.
 3. **Receipts over screenshots.** Runs should emit machine-verifiable provenance, hashes, diagnostics, and checkpoint metadata alongside visual output.
 4. **Determinism is qualified.** Bitwise reproducibility, backend-local reproducibility, and tolerance-based cross-device reproducibility are different claims and must be reported separately.
-5. **Validation before spectacle.** Benchmark and analytic-reference cases precede large turbulence runs.
+5. **Verification before spectacle.** Analytic-reference, refinement, and benchmark cases precede large turbulence runs. Physical-validation claims require separate physical evidence.
 6. **No hidden physics.** Numerical stabilizers, filtering, forcing, clipping, precision changes, and backend-specific behavior must be declared.
 7. **Visualization and sonification are derived views.** They may represent the simulation but never redefine its canonical state.
 
-## Planned validation cases
+## Planned evidence suite
+
+The initial suite is primarily a **numerical verification** suite:
 
 - Taylor–Green vortex
 - Plane Poiseuille/channel flow
 - Lid-driven cavity
 - Cylinder wake / vortex shedding
 
-Each benchmark should define expected diagnostics, acceptable error metrics, grid/time refinement expectations, and reproducibility requirements.
+Each case should define its evidence type, reference source, expected diagnostics, acceptable error metrics, grid/time refinement expectations, and reproducibility requirements. A comparison against experimental or observational data counts as physical validation only when the physical mapping, measurement uncertainty, and acceptance criteria are documented.
 
 ## Reproducibility model
 
 NS-SIM distinguishes several classes of reproducibility:
 
-- **R0 — Contract reproducible:** equations, inputs, solver contract, and provenance are fully specified.
-- **R1 — Initial-state reproducible:** canonical initialization reproduces the same serialized state.
+- **R0 — Contract reproducible:** the normalized semantic experiment contract is fully specified and stably identified. Execution provenance is not required at R0 because no execution need have occurred.
+- **R1 — Initial-state reproducible:** canonical CPU initialization under a declared initialization environment reproduces the same serialized initial state and identity hash. The environment includes backend, precision, software/runtime or container identity, and serialization version, plus hardware identity when it can affect initialization.
 - **R2 — Backend-local bitwise reproducible:** repeated runs match bit-for-bit under a declared backend/device/software environment.
 - **R3 — Cross-backend numerically reproducible:** results agree within declared norms and tolerances.
 - **R4 — Canonical reference reproducible:** the supported CPU reference path reproduces the archival reference result under its pinned environment.
+
+R0 identifies an experiment contract, not an executed run. Completed-run receipts require execution provenance independently of whether the experiment qualifies for R0.
 
 A GPU result must never be promoted from numerical agreement to bitwise equivalence without evidence.
 
@@ -72,8 +78,11 @@ initial_state_hash
 checkpoint_hashes
 final_state_hash
 diagnostics
-validation_result
+verification_result
+validation_status
 ```
+
+`validation_status` may be `not_claimed` when no physical-validation evidence applies. A positive physical-validation claim requires a separately identified validation reference and uncertainty/tolerance contract.
 
 ## Planned repository layout
 
@@ -83,7 +92,7 @@ NS-SIM/
 ├── runtime/            # execution, receipts, checkpoints, replay
 ├── backends/           # CPU, CUDA, later multi-GPU implementations
 ├── experiments/        # canonical benchmark and research configurations
-├── validation/         # analytic/reference comparisons and regression checks
+├── validation/         # verification and physical-validation evidence tooling
 ├── viz/                # derived visualization tooling
 ├── sonification/       # derived deterministic audio mappings
 ├── formal/             # later formal specifications / assurance where useful
@@ -98,7 +107,7 @@ The layout is a target architecture, not a claim that these modules already exis
 - [Architecture](ARCHITECTURE.md)
 - [Scientific contract](docs/SCIENTIFIC_CONTRACT.md)
 - [Determinism and reproducibility](docs/DETERMINISM.md)
-- [Validation policy](docs/VALIDATION.md)
+- [Verification and validation policy](docs/VALIDATION.md)
 - [Experiment schema](docs/EXPERIMENT_SCHEMA.md)
 - [Backend contract](docs/BACKENDS.md)
 - [Remote compute policy](docs/REMOTE_COMPUTE.md)
