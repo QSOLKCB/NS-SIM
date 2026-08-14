@@ -27,6 +27,17 @@ CUDA_BENCHMARK_SCHEMA = "ns-sim-backend-performance/1"
 CUDA_PROVENANCE_LOCK_SCHEMA = "ns-sim-cuda-provenance-lock/1"
 CUDA_COMPARISON_CONTRACT_SCHEMA = "ns-sim-backend-comparison-contract/1"
 
+MANDATORY_COMPARISON_METRICS = (
+    "u_linf",
+    "v_linf",
+    "p_linf",
+    "velocity_l2",
+    "divergence_linf_abs_diff",
+    "kinetic_energy_abs_diff",
+    "enstrophy_abs_diff",
+    "pressure_residual_linf_abs_diff",
+)
+
 
 @dataclass
 class DeviceState:
@@ -79,6 +90,34 @@ def _property(props: dict[Any, Any], name: str, default: Any = None) -> Any:
     if encoded in props:
         return props[encoded]
     return default
+
+
+def _normalized_device_uuid(value: Any) -> str:
+    if isinstance(value, dict):
+        value = value.get("bytes", value.get(b"bytes"))
+    if hasattr(value, "bytes"):
+        value = value.bytes
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text:
+            return text
+        raise ConfigurationError("CUDA device UUID is empty")
+    try:
+        raw = bytes(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("CUDA runtime did not expose a usable stable device UUID") from exc
+    if len(raw) != 16:
+        raise ConfigurationError(
+            f"CUDA runtime exposed a device UUID with unexpected length {len(raw)}; expected 16 bytes"
+        )
+    hexed = raw.hex()
+    return f"{hexed[:8]}-{hexed[8:12]}-{hexed[12:16]}-{hexed[16:20]}-{hexed[20:]}"
+
+
+def _resolved_source_revision() -> tuple[str, bool]:
+    revision = source_revision()
+    usable = isinstance(revision, str) and bool(revision.strip()) and revision.strip().lower() != "unknown"
+    return revision, usable
 
 
 def _validate_cuda_candidate_contract(experiment: dict[str, Any]) -> None:
@@ -241,10 +280,7 @@ def _compute_array_diagnostics(
 
 
 def _host_state(xp, state: DeviceState) -> State:
-    if xp is np:
-        to_host = np.asarray
-    else:
-        to_host = xp.asnumpy
+    to_host = np.asarray if xp is np else xp.asnumpy
     return State(
         u=np.ascontiguousarray(to_host(state.u), dtype=np.float64),
         v=np.ascontiguousarray(to_host(state.v), dtype=np.float64),
@@ -322,15 +358,41 @@ def _run_cpu_reference_in_memory(
     return state, history
 
 
-def capture_cuda_provenance(device_id: int = 0, cp=None) -> dict[str, Any]:
-    cp = _load_cupy() if cp is None else cp
-    count = int(cp.cuda.runtime.getDeviceCount())
+def _validate_device_ordinal(cp, device_id: int) -> int:
+    if isinstance(device_id, bool) or not isinstance(device_id, int):
+        raise ConfigurationError("CUDA device ordinal must be an integer")
+    try:
+        count = int(cp.cuda.runtime.getDeviceCount())
+    except Exception as exc:
+        raise ConfigurationError(f"unable to enumerate CUDA devices: {exc}") from exc
+    if count < 1:
+        raise ConfigurationError("no CUDA devices are available")
     if device_id < 0 or device_id >= count:
         raise ConfigurationError(f"CUDA device {device_id} is outside available range 0..{count - 1}")
-    device = cp.cuda.Device(device_id)
-    device.use()
-    props = cp.cuda.runtime.getDeviceProperties(device_id)
-    local_runtime = None
+    return count
+
+
+def capture_cuda_provenance(device_id: int = 0, cp=None) -> dict[str, Any]:
+    cp = _load_cupy() if cp is None else cp
+    _validate_device_ordinal(cp, device_id)
+    try:
+        device = cp.cuda.Device(device_id)
+        device.use()
+        props = cp.cuda.runtime.getDeviceProperties(device_id)
+    except Exception as exc:
+        raise ConfigurationError(f"failed to select CUDA device {device_id}: {exc}") from exc
+
+    raw_uuid = _property(props, "uuid")
+    if raw_uuid is None:
+        raise ConfigurationError(
+            "CUDA runtime did not expose a stable physical device UUID; exact GPU provenance cannot be claimed"
+        )
+    device_uuid = _normalized_device_uuid(raw_uuid)
+    try:
+        pci_bus_id = _decode_device_name(cp.cuda.runtime.deviceGetPCIBusId(device_id))
+    except Exception as exc:
+        raise ConfigurationError(f"failed to obtain PCI bus identity for CUDA device {device_id}: {exc}") from exc
+
     try:
         local_runtime = cp.cuda.get_local_runtime_version()
     except Exception:
@@ -338,6 +400,8 @@ def capture_cuda_provenance(device_id: int = 0, cp=None) -> dict[str, Any]:
     environment = {
         "backend": CUDA_BACKEND,
         "device_ordinal": int(device_id),
+        "device_uuid": device_uuid,
+        "pci_bus_id": pci_bus_id,
         "gpu_name": _decode_device_name(_property(props, "name", "unknown")),
         "compute_capability": [
             int(_property(props, "major", -1)),
@@ -382,6 +446,8 @@ def _load_provenance_lock(path: str | Path) -> dict[str, Any]:
     environment = document.get("environment")
     if not isinstance(environment, dict):
         raise ConfigurationError("CUDA provenance lock environment must be an object")
+    if not isinstance(environment.get("device_uuid"), str) or not environment["device_uuid"]:
+        raise ConfigurationError("CUDA provenance lock must include a stable device_uuid")
     expected_identity = environment.get("environment_identity")
     if not isinstance(expected_identity, str) or identity_hash(
         {key: value for key, value in environment.items() if key != "environment_identity"}
@@ -398,8 +464,7 @@ def enforce_cuda_provenance_lock(
         return {"required": False, "matched": None, "lock_identity": None}
     lock = _load_provenance_lock(lock_path)
     expected = lock["environment"]
-    matched = current == expected
-    if not matched:
+    if current != expected:
         raise ConfigurationError(
             "current CUDA GPU/software provenance does not match the pinned provenance lock"
         )
@@ -426,9 +491,10 @@ def execute_cuda_experiment(
     output = Path(output_dir)
     _prepare_output(output)
     cp = _load_cupy()
-    cp.cuda.Device(device_id).use()
-    environment = capture_cuda_provenance(device_id, cp)
-    lock_status = enforce_cuda_provenance_lock(environment, provenance_lock)
+    cuda_environment = capture_cuda_provenance(device_id, cp)
+    lock_status = enforce_cuda_provenance_lock(cuda_environment, provenance_lock)
+    initialization_environment = environment_provenance()
+    revision, revision_usable = _resolved_source_revision()
     experiment_hash = identity_hash(experiment)
     (output / "experiment.normalized.json").write_text(pretty_json(experiment), encoding="utf-8")
     (output / "experiment.identity.json").write_bytes(canonical_json_bytes(experiment) + b"\n")
@@ -468,12 +534,14 @@ def execute_cuda_experiment(
     report = {
         "schema_version": CUDA_RUN_SCHEMA,
         "run_status": "completed",
-        "source_revision": source_revision(),
+        "source_revision": revision,
+        "source_revision_usable": revision_usable,
         "experiment_hash": experiment_hash,
         "canonical_reference_backend": "cpu-reference-v1",
         "execution_backend": CUDA_BACKEND,
         "device_ordinal": int(device_id),
-        "environment": environment,
+        "initialization_environment": initialization_environment,
+        "environment": cuda_environment,
         "provenance_lock": lock_status,
         "precision": experiment["precision"],
         "initial_state_hash": initial_hash,
@@ -482,6 +550,7 @@ def execute_cuda_experiment(
         "diagnostics": history,
         "reproducibility": {
             "demonstrated": ["R0", "R1"],
+            "R1_initialization_environment_identity": initialization_environment["environment_identity"],
             "R2_status": "not_assessed_by_single_execution",
             "R3_status": "not_assessed_by_single_execution",
         },
@@ -491,9 +560,10 @@ def execute_cuda_experiment(
     report["run_id"] = identity_hash(
         {
             "experiment_hash": experiment_hash,
-            "environment_identity": environment["environment_identity"],
+            "initialization_environment_identity": initialization_environment["environment_identity"],
+            "cuda_environment_identity": cuda_environment["environment_identity"],
             "final_state_hash": final_hash,
-            "source_revision": report["source_revision"],
+            "source_revision": revision,
         }
     )
     (output / "cuda-run.json").write_text(pretty_json(report), encoding="utf-8")
@@ -527,7 +597,12 @@ def verify_cuda_repeat(
         provenance_lock=provenance_lock,
     )
     comparisons = {
+        "source_revision": run_a["source_revision"] == run_b["source_revision"],
         "experiment_hash": run_a["experiment_hash"] == run_b["experiment_hash"],
+        "initialization_environment_identity": (
+            run_a["initialization_environment"]["environment_identity"]
+            == run_b["initialization_environment"]["environment_identity"]
+        ),
         "environment_identity": (
             run_a["environment"]["environment_identity"]
             == run_b["environment"]["environment_identity"]
@@ -538,16 +613,26 @@ def verify_cuda_repeat(
         "diagnostics": run_a["diagnostics"] == run_b["diagnostics"],
     }
     bitwise_match = all(comparisons.values())
+    provenance_complete = bool(run_a["source_revision_usable"] and run_b["source_revision_usable"])
+    if bitwise_match and provenance_complete:
+        r2_status = "demonstrated"
+    elif bitwise_match:
+        r2_status = "withheld_missing_source_revision"
+    else:
+        r2_status = "not_demonstrated"
     report = {
         "schema_version": CUDA_REPEAT_SCHEMA,
         "backend": CUDA_BACKEND,
-        "source_revision": source_revision(),
+        "source_revision": run_a["source_revision"],
+        "source_revision_usable": provenance_complete,
         "experiment_hash": run_a["experiment_hash"],
+        "initialization_environment_identity": run_a["initialization_environment"]["environment_identity"],
         "environment_identity": run_a["environment"]["environment_identity"],
         "comparisons": comparisons,
         "bitwise_match": bitwise_match,
+        "provenance_complete": provenance_complete,
         "reproducibility_classification": {
-            "R2_status": "demonstrated" if bitwise_match else "not_demonstrated",
+            "R2_status": r2_status,
             "R3_status": "not_assessed",
         },
         "physical_validation_status": "not_claimed",
@@ -568,10 +653,29 @@ def load_backend_comparison_contract(path: str | Path) -> dict[str, Any]:
         raise ConfigurationError(f"backend comparison candidate must be {CUDA_BACKEND}")
     if contract.get("precision") != {"dtype": "float64", "byte_order": "little"}:
         raise ConfigurationError("backend comparison contract precision must be float64/little")
+    scope = contract.get("scope")
+    if not isinstance(scope, dict):
+        raise ConfigurationError("backend comparison contract scope must be an object")
     metrics = contract.get("metrics")
-    if not isinstance(metrics, dict) or not metrics:
-        raise ConfigurationError("backend comparison contract metrics must be a non-empty object")
-    for name, spec in metrics.items():
+    if not isinstance(metrics, dict):
+        raise ConfigurationError("backend comparison contract metrics must be an object")
+    required = set(MANDATORY_COMPARISON_METRICS)
+    provided = set(metrics)
+    if provided != required:
+        missing = sorted(required - provided)
+        extra = sorted(provided - required)
+        details = []
+        if missing:
+            details.append(f"missing={missing}")
+        if extra:
+            details.append(f"unsupported={extra}")
+        raise ConfigurationError(
+            "backend comparison contract must contain the complete versioned metric set ("
+            + ", ".join(details)
+            + ")"
+        )
+    for name in MANDATORY_COMPARISON_METRICS:
+        spec = metrics[name]
         if not isinstance(spec, dict):
             raise ConfigurationError(f"comparison metric {name!r} must be an object")
         for key in ("absolute_tolerance", "relative_tolerance"):
@@ -583,6 +687,27 @@ def load_backend_comparison_contract(path: str | Path) -> dict[str, Any]:
                     f"comparison metric {name!r} {key} must be finite and >= 0"
                 )
     return contract
+
+
+def _expected_comparison_scope(experiment: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "boundary_conditions": dict(experiment["boundary_conditions"]),
+        "comparison_kind": "single-experiment final-state and final-diagnostic R3 gate",
+        "discretization": experiment["discretization"]["name"],
+        "model": experiment["model"]["name"],
+        "model_version": experiment["model"]["version"],
+        "pressure_solver": experiment["solver"]["pressure"]["method"],
+        "time_integration": experiment["time_integration"]["name"],
+    }
+
+
+def _validate_comparison_scope(contract: dict[str, Any], experiment: dict[str, Any]) -> None:
+    expected = _expected_comparison_scope(experiment)
+    if contract["scope"] != expected:
+        raise ConfigurationError(
+            "backend comparison contract scope does not match the normalized experiment; "
+            f"expected {expected!r}"
+        )
 
 
 def _final_diagnostic(history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -613,21 +738,11 @@ def _state_comparison_metrics(
         np.sqrt(np.mean(cpu_state.u * cpu_state.u + cpu_state.v * cpu_state.v, dtype=np.float64))
     )
     return {
-        "u_linf": metric(
-            float(np.max(np.abs(du))),
-            float(np.max(np.abs(cpu_state.u))),
-        ),
-        "v_linf": metric(
-            float(np.max(np.abs(dv))),
-            float(np.max(np.abs(cpu_state.v))),
-        ),
-        "p_linf": metric(
-            float(np.max(np.abs(dp))),
-            float(np.max(np.abs(cpu_state.p))),
-        ),
+        "u_linf": metric(float(np.max(np.abs(du))), float(np.max(np.abs(cpu_state.u)))),
+        "v_linf": metric(float(np.max(np.abs(dv))), float(np.max(np.abs(cpu_state.v)))),
+        "p_linf": metric(float(np.max(np.abs(dp))), float(np.max(np.abs(cpu_state.p)))),
         "velocity_l2": metric(
-            float(np.sqrt(np.mean(du * du + dv * dv, dtype=np.float64))),
-            cpu_velocity_rms,
+            float(np.sqrt(np.mean(du * du + dv * dv, dtype=np.float64))), cpu_velocity_rms
         ),
         "divergence_linf_abs_diff": metric(
             abs(float(cuda_diag["divergence_linf"]) - float(cpu_diag["divergence_linf"])),
@@ -657,9 +772,10 @@ def _assess_comparison_metrics(
 ) -> tuple[bool, dict[str, Any]]:
     assessments: dict[str, Any] = {}
     passed = True
-    for name, spec in contract["metrics"].items():
+    for name in MANDATORY_COMPARISON_METRICS:
         if name not in observed:
             raise ConfigurationError(f"comparison implementation does not provide required metric {name!r}")
+        spec = contract["metrics"][name]
         atol = float(spec["absolute_tolerance"])
         rtol = float(spec["relative_tolerance"])
         error = float(observed[name]["absolute_error"])
@@ -669,6 +785,7 @@ def _assess_comparison_metrics(
             math.isfinite(error)
             and math.isfinite(scale)
             and scale >= 0.0
+            and math.isfinite(threshold)
             and error <= threshold
         )
         assessments[name] = {
@@ -698,21 +815,32 @@ def compare_cpu_cuda(
     )
     _validate_cuda_candidate_contract(experiment)
     contract = load_backend_comparison_contract(comparison_contract_path)
+    _validate_comparison_scope(contract, experiment)
     cp = _load_cupy()
-    cp.cuda.Device(device_id).use()
     cuda_environment = capture_cuda_provenance(device_id, cp)
     lock_status = enforce_cuda_provenance_lock(cuda_environment, provenance_lock)
     cpu_environment = environment_provenance()
+    revision, revision_usable = _resolved_source_revision()
 
     cpu_state, cpu_history = _run_cpu_reference_in_memory(experiment)
     cuda_state, cuda_history = _run_array_backend(experiment, cp)
     observed = _state_comparison_metrics(cpu_state, cuda_state, cpu_history, cuda_history)
-    passed, assessments = _assess_comparison_metrics(observed, contract)
+    numerical_gate_passed, assessments = _assess_comparison_metrics(observed, contract)
+    evidence_passed = numerical_gate_passed and revision_usable
+    if evidence_passed:
+        r3_status = "demonstrated"
+    elif numerical_gate_passed:
+        r3_status = "withheld_missing_source_revision"
+    else:
+        r3_status = "not_demonstrated"
     experiment_hash = identity_hash(experiment)
     report = {
         "schema_version": CUDA_COMPARISON_SCHEMA,
-        "passed": passed,
-        "source_revision": source_revision(),
+        "passed": evidence_passed,
+        "numerical_gate_passed": numerical_gate_passed,
+        "provenance_complete": revision_usable,
+        "source_revision": revision,
+        "source_revision_usable": revision_usable,
         "experiment_hash": experiment_hash,
         "comparison_contract_identity": identity_hash(contract),
         "comparison_contract": contract,
@@ -732,10 +860,12 @@ def compare_cpu_cuda(
         "metrics": assessments,
         "reproducibility_classification": {
             "R2_status": "not_assessed",
-            "R3_status": "demonstrated" if passed else "not_demonstrated",
+            "R3_status": r3_status,
         },
         "numerical_verification_status": (
-            "cross_backend_comparison_passed" if passed else "cross_backend_comparison_failed"
+            "cross_backend_comparison_passed"
+            if numerical_gate_passed
+            else "cross_backend_comparison_failed"
         ),
         "physical_validation_status": "not_claimed",
     }
@@ -769,13 +899,23 @@ def benchmark_cpu_cuda(
         device_id=device_id,
         provenance_lock=provenance_lock,
     )
-    if not comparison["passed"]:
+    if comparison["reproducibility_classification"]["R3_status"] != "demonstrated":
         raise NumericalError(
-            "performance benchmark refused because CPU/CUDA numerical comparison did not pass"
+            "performance benchmark refused because CPU/CUDA R3 evidence was not demonstrated"
         )
 
     cp = _load_cupy()
-    cp.cuda.Device(device_id).use()
+    current_cuda_environment = capture_cuda_provenance(device_id, cp)
+    if current_cuda_environment != comparison["candidate_backend"]["environment"]:
+        raise ConfigurationError(
+            "CUDA environment changed after the R3 verification gate and before performance timing"
+        )
+    current_cpu_environment = environment_provenance()
+    if current_cpu_environment != comparison["reference_backend"]["environment"]:
+        raise ConfigurationError(
+            "CPU reference environment changed after the R3 verification gate and before performance timing"
+        )
+
     for _ in range(warmup):
         _run_array_backend(experiment, cp, collect_history=False)
         cp.cuda.Stream.null.synchronize()
@@ -798,24 +938,24 @@ def benchmark_cpu_cuda(
     cuda_median = float(np.median(np.asarray(cuda_seconds, dtype=np.float64)))
     report = {
         "schema_version": CUDA_BENCHMARK_SCHEMA,
-        "source_revision": source_revision(),
+        "source_revision": comparison["source_revision"],
         "experiment_hash": identity_hash(experiment),
         "verification_gate": {
             "required": True,
             "passed": True,
             "comparison_schema": comparison["schema_version"],
             "comparison_contract_identity": comparison["comparison_contract_identity"],
-            "R3_status": comparison["reproducibility_classification"]["R3_status"],
+            "R3_status": "demonstrated",
         },
         "reference_backend": {
             "name": "cpu-reference-v1",
-            "environment": comparison["reference_backend"]["environment"],
+            "environment": current_cpu_environment,
             "durations_seconds": cpu_seconds,
             "median_seconds": cpu_median,
         },
         "candidate_backend": {
             "name": CUDA_BACKEND,
-            "environment": comparison["candidate_backend"]["environment"],
+            "environment": current_cuda_environment,
             "durations_seconds": cuda_seconds,
             "median_seconds": cuda_median,
         },
