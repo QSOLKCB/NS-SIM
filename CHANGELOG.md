@@ -4,6 +4,17 @@ All notable project changes should be documented here. The project is pre-alpha 
 
 ## Unreleased
 
+### Phase 2 numerical verification
+
+- Add reusable Taylor–Green spatial and temporal refinement studies with explicit archived acceptance gates.
+- Add deterministic plane-Poiseuille analytic/no-slip verification and second-order flow-rate refinement.
+- Add versioned verification-reference archives and candidate comparison utilities.
+- Archive Re=100 Ghia–Ghia–Shin lid-driven-cavity centerline data with explicit NS-SIM tolerances.
+- Archive Re=100 DFG/FeatFlow cylinder-wake Strouhal and force metrics with explicit NS-SIM tolerances.
+- Add `verify-phase2` and `verify-benchmark` CLI commands plus CI coverage.
+- Keep cavity/cylinder status fail-honest as `candidate_required` until a declared non-periodic wall/obstacle solver produces candidate observables.
+- Keep physical validation explicitly `not_claimed`.
+
 ### Phase 1 canonical runtime
 
 - Implement the `cpu-reference-v1` 2D incompressible periodic finite-difference projection runtime.
