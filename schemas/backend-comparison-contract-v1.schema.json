@@ -1,0 +1,40 @@
+{
+  "$id": "https://github.com/QSOLKCB/NS-SIM/schemas/backend-comparison-contract-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_backend": {"const": "cuda-single-gpu-v1"},
+    "metrics": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "absolute_tolerance": {"minimum": 0, "type": "number"},
+          "relative_tolerance": {"minimum": 0, "type": "number"}
+        },
+        "required": ["absolute_tolerance", "relative_tolerance"],
+        "type": "object"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "notes": {"minLength": 1, "type": "string"},
+    "precision": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_order": {"const": "little"},
+        "dtype": {"const": "float64"}
+      },
+      "required": ["dtype", "byte_order"],
+      "type": "object"
+    },
+    "reference_backend": {"const": "cpu-reference-v1"},
+    "schema_version": {"const": "ns-sim-backend-comparison-contract/1"},
+    "scope": {"type": "object"}
+  },
+  "required": [
+    "schema_version", "reference_backend", "candidate_backend",
+    "precision", "scope", "metrics", "notes"
+  ],
+  "title": "NS-SIM Backend Comparison Contract",
+  "type": "object"
+}
