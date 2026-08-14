@@ -181,7 +181,11 @@ def main(argv: list[str] | None = None) -> int:
                 provenance_lock=args.provenance_lock,
             )
             print(json.dumps(report, sort_keys=True))
-            return 0 if report["bitwise_match"] else 3
+            return (
+                0
+                if report["reproducibility_classification"]["R2_status"] == "demonstrated"
+                else 3
+            )
         if args.command == "compare-backends":
             report = compare_cpu_cuda(
                 args.experiment,
