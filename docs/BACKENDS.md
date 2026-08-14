@@ -4,7 +4,7 @@ Backends execute a versioned canonical numerical contract. They are replaceable 
 
 ## Canonical CPU backend
 
-Phase 1 implements `cpu-reference-v1` in NumPy. The reference path prioritizes clarity, determinism, and auditability over peak performance and is the basis for regression and future accelerated-backend comparison.
+Phase 1 implements `cpu-reference-v1` in NumPy. The reference path prioritizes clarity, determinism, and auditability over peak performance and is the basis for regression and accelerated-backend comparison.
 
 The current CPU contract includes:
 
@@ -24,15 +24,40 @@ The current CPU implementation is not yet an archival R4 reference. R4 requires 
 
 ## CUDA backend
 
-A CUDA backend is future Phase 3 work. It may change memory layout, kernel fusion, parallel decomposition, reduction implementation, and other execution details where those changes preserve the declared numerical contract or are explicitly versioned deviations.
+Phase 3 implements `cuda-single-gpu-v1` with CuPy as a correctness-first single-GPU candidate backend for the existing periodic float64 contract.
 
-The backend must report relevant provenance such as GPU model, compute capability where useful, driver/runtime/toolkit versions, numerical-library versions, precision modes, and determinism settings.
+The canonical experiment still declares `backend_request.name = cpu-reference-v1`. CUDA execution is an explicitly named candidate implementation of that frozen contract; Phase 3 does not broaden or silently rewrite the Phase 1 experiment schema.
 
-A CUDA backend must not inherit R2 from the CPU path. Cross-backend equivalence is an R3-style numerical comparison unless direct byte identity has separately been demonstrated under the applicable environments.
+The backend currently mirrors:
+
+- `finite_difference_projection_v1`;
+- centered second-order advection and diffusion;
+- backward-divergence / forward-gradient projection;
+- `forward_euler_projection_v1`;
+- `jacobi_periodic_v1`;
+- periodic x/y boundaries;
+- float64 state and host-side `ns-sim-state/1` serialization;
+- experiment-declared checkpoint scheduling and hard numerical diagnostics.
+
+`ns-sim run-cuda` emits a versioned CUDA run artifact. `ns-sim cuda-provenance` captures an exact GPU/software environment lock, and `--provenance-lock` fails closed when the current environment differs from the pinned one.
+
+The recorded CUDA environment includes GPU model, device ordinal, compute capability, total global memory, CUDA driver version, the CUDA runtime linked to CuPy, the locally detected CUDA runtime when available, CuPy/NumPy/Python versions, platform identity, byte order, precision, and the single-GPU/no-mixed-precision declaration.
+
+`ns-sim verify-cuda-repeat` is the backend-local evidence path. It reports R2 only when repeated executions match experiment/environment identities, canonical initial/final state identities, checkpoint hashes, and diagnostic history.
+
+`ns-sim compare-backends` is the cross-backend evidence path. It compares the CUDA candidate against `cpu-reference-v1` under `verification/backends/cuda-single-gpu-v1.json`. A passing gate reports R3 only for the specific experiment hash, source revision, comparison-contract identity, and recorded environments.
+
+A CUDA backend does not inherit R2 from the CPU path. R2 and R3 are separately demonstrated claims.
+
+### Performance gate
+
+`ns-sim benchmark-backends` first executes the R3 numerical comparison and refuses to publish timing results if that gate fails. Timing reports include both environments, experiment identity, comparison-contract identity, individual durations, medians, and the observed speed ratio.
+
+The first CUDA implementation intentionally mirrors the reference Jacobi iteration and synchronizes scalar residual checks. This favors auditability over peak throughput; later optimization is permitted only while the declared comparison gates remain satisfied.
 
 ## Precision
 
-Precision is semantic when it can materially change the trajectory or evidence result. Phase 1 accepts only float64 canonical computation/state.
+Precision is semantic when it can materially change the trajectory or evidence result. Phase 1 and `cuda-single-gpu-v1` accept only float64 canonical computation/state.
 
 FP32, TF32, mixed precision, and reduced-precision solver paths require explicit future contracts and must not be silently substituted for float64.
 
