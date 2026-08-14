@@ -13,12 +13,20 @@
     "cylinder_radius": 0.05,
     "nu": 0.001,
     "mean_velocity": 1.0,
-    "characteristic_length": 0.1
+    "characteristic_length": 0.1,
+    "reference_time_step": 0.005,
+    "flow_state": "time-periodic"
+  },
+  "observable_definitions": {
+    "strouhal": "St = f*D/U_mean, with D=0.1 and U_mean=1.0",
+    "cd_mean": "time mean of drag coefficient using the DFG/FeatFlow force normalization for benchmark 2D-2",
+    "cd_amplitude": "half peak-to-peak drag-coefficient amplitude under the same DFG/FeatFlow normalization",
+    "cl_amplitude": "half peak-to-peak lift-coefficient amplitude under the same DFG/FeatFlow normalization"
   },
   "metrics": {
     "strouhal": 0.30188,
     "cd_mean": 3.1884,
-    "cd_amplitude": 0.06310,
+    "cd_amplitude": 0.0631,
     "cl_amplitude": 2.008
   },
   "tolerances": {
@@ -27,5 +35,5 @@
     "cd_amplitude": 0.03,
     "cl_amplitude": 0.15
   },
-  "notes": "Reference values use the fine FeatFlow Q2/P1disc periodic benchmark result (level 6, k=1/200 where tabulated). Tolerances are NS-SIM verification gates, not measurement uncertainty. Passing is numerical verification evidence only."
+  "notes": "Reference values use the fine FeatFlow Q2/P1disc periodic benchmark result (level 6, k=1/200 where tabulated). Candidate evidence must declare the identical regime and observable definitions. Tolerances are NS-SIM verification gates, not measurement uncertainty."
 }
