@@ -47,13 +47,27 @@ Still required before Phase 2 can be called complete:
 
 The Phase 1 periodic canonical backend is not silently broadened to satisfy these cases. Archived reference gates remain `candidate_required` until a solver with declared boundary/geometry semantics produces the candidate data.
 
-## Phase 3 — CUDA acceleration
+## Phase 3 — CUDA acceleration — implementation available in pre-alpha
 
-- single-GPU backend;
-- CPU-reference comparison harness;
-- declared reproducibility classification;
-- pinned GPU/software provenance;
-- performance benchmarks that do not weaken verification requirements.
+Implemented:
+
+- `cuda-single-gpu-v1` correctness-first CuPy backend for the Phase 1 periodic float64 numerical contract;
+- canonical CPU-defined initialization followed by explicit single-device CUDA execution;
+- experiment-declared checkpoint scheduling and host serialization through `ns-sim-state/1`;
+- exact CUDA GPU/software provenance capture and optional fail-closed provenance locks;
+- backend-local CUDA repeat verifier with explicit R2 classification;
+- CPU-reference/CUDA comparison harness with versioned metric/tolerance contract and explicit R3 classification;
+- performance benchmark harness that refuses timing publication unless the R3 numerical-comparison gate passes;
+- CPU-only CI coverage of the CUDA numerical path through NumPy emulation and comparison/provenance contract tests.
+
+Hardware evidence still required before release-level CUDA claims:
+
+- execute `verify-cuda-repeat` on a declared NVIDIA GPU and archive the R2 result;
+- execute `compare-backends` on that environment and archive a passing R3 report;
+- execute `benchmark-backends` only after the R3 gate passes and archive the scoped performance report;
+- retain the exact CUDA provenance lock with the evidence.
+
+Phase 3 code availability is not itself a claim that any particular GPU, driver, or CuPy environment has demonstrated R2/R3 or a speedup. Those claims require recorded hardware execution.
 
 ## Phase 4 — Derived analysis
 

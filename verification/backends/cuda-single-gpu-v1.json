@@ -1,0 +1,56 @@
+{
+  "candidate_backend": "cuda-single-gpu-v1",
+  "metrics": {
+    "divergence_linf_abs_diff": {
+      "absolute_tolerance": 1e-09,
+      "relative_tolerance": 1e-08
+    },
+    "enstrophy_abs_diff": {
+      "absolute_tolerance": 1e-10,
+      "relative_tolerance": 1e-08
+    },
+    "kinetic_energy_abs_diff": {
+      "absolute_tolerance": 1e-12,
+      "relative_tolerance": 1e-08
+    },
+    "p_linf": {
+      "absolute_tolerance": 1e-07,
+      "relative_tolerance": 1e-08
+    },
+    "pressure_residual_linf_abs_diff": {
+      "absolute_tolerance": 1e-09,
+      "relative_tolerance": 1e-08
+    },
+    "u_linf": {
+      "absolute_tolerance": 1e-09,
+      "relative_tolerance": 1e-08
+    },
+    "v_linf": {
+      "absolute_tolerance": 1e-09,
+      "relative_tolerance": 1e-08
+    },
+    "velocity_l2": {
+      "absolute_tolerance": 1e-10,
+      "relative_tolerance": 1e-08
+    }
+  },
+  "notes": "These are repository numerical-comparison gates for the Phase 3 float64 single-GPU candidate backend. Passing demonstrates R3 for the specific experiment and recorded environments only. It is not physical validation and does not imply cross-GPU bitwise identity.",
+  "precision": {
+    "byte_order": "little",
+    "dtype": "float64"
+  },
+  "reference_backend": "cpu-reference-v1",
+  "schema_version": "ns-sim-backend-comparison-contract/1",
+  "scope": {
+    "boundary_conditions": {
+      "x": "periodic",
+      "y": "periodic"
+    },
+    "comparison_kind": "single-experiment final-state and final-diagnostic R3 gate",
+    "discretization": "finite_difference_projection_v1",
+    "model": "incompressible-navier-stokes-2d",
+    "model_version": "1",
+    "pressure_solver": "jacobi_periodic_v1",
+    "time_integration": "forward_euler_projection_v1"
+  }
+}

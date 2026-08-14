@@ -13,7 +13,9 @@ authors = [{name = "Trent Slade"}]
 dependencies = ["numpy>=1.26,<3"]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<10"]
+test = ["pytest>=8,<10", "jsonschema>=4.23,<5"]
+cuda12 = ["cupy-cuda12x>=14,<15"]
+cuda13 = ["cupy-cuda13x>=14,<15"]
 
 [project.scripts]
 ns-sim = "ns_sim.cli:main"

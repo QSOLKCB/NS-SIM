@@ -59,3 +59,20 @@ jobs:
           assert report['cases']['cylinder_wake']['status'] == 'reference_gate_ready'
           assert report['validation_status'] == 'not_claimed'
           PY
+
+  phase3-cuda-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CPU-only test environment
+        run: python -m pip install -e '.[test]'
+      - name: CUDA contract regressions without claiming GPU evidence
+        run: |
+          python -m pytest tests/test_cuda_phase3.py
+          python -c "import ns_sim.cuda_backend"
+          ns-sim --help | grep -q 'compare-backends'
+          ns-sim --help | grep -q 'benchmark-backends'

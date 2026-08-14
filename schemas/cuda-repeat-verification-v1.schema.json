@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSOLKCB/NS-SIM/schemas/cuda-repeat-verification-v1.schema.json",
+  "title": "NS-SIM CUDA Repeat Verification Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "backend", "source_revision", "source_revision_usable", "experiment_hash",
+    "initialization_environment_identity", "environment_identity", "comparisons", "bitwise_match",
+    "provenance_complete", "reproducibility_classification", "physical_validation_status"
+  ],
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+  "properties": {
+    "schema_version": {"const": "ns-sim-cuda-repeat-verification/1"},
+    "backend": {"const": "cuda-single-gpu-v1"},
+    "source_revision": {"type": "string", "minLength": 1},
+    "source_revision_usable": {"type": "boolean"},
+    "experiment_hash": {"$ref": "#/$defs/sha256"},
+    "initialization_environment_identity": {"$ref": "#/$defs/sha256"},
+    "environment_identity": {"$ref": "#/$defs/sha256"},
+    "comparisons": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "source_revision", "experiment_hash", "initialization_environment_identity",
+        "environment_identity", "initial_state_hash", "final_state_hash", "checkpoint_hashes", "diagnostics"
+      ],
+      "properties": {
+        "source_revision": {"type": "boolean"}, "experiment_hash": {"type": "boolean"},
+        "initialization_environment_identity": {"type": "boolean"}, "environment_identity": {"type": "boolean"},
+        "initial_state_hash": {"type": "boolean"}, "final_state_hash": {"type": "boolean"},
+        "checkpoint_hashes": {"type": "boolean"}, "diagnostics": {"type": "boolean"}
+      }
+    },
+    "bitwise_match": {"type": "boolean"},
+    "provenance_complete": {"type": "boolean"},
+    "reproducibility_classification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["R2_status", "R3_status"],
+      "properties": {
+        "R2_status": {"enum": ["demonstrated", "not_demonstrated", "withheld_missing_source_revision"]},
+        "R3_status": {"const": "not_assessed"}
+      }
+    },
+    "physical_validation_status": {"const": "not_claimed"}
+  }
+}

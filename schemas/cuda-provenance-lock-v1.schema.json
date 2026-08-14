@@ -1,0 +1,61 @@
+{
+  "$id": "https://github.com/QSOLKCB/NS-SIM/schemas/cuda-provenance-lock-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "environment": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {"const": "cuda-single-gpu-v1"},
+        "byteorder": {"enum": ["little", "big"]},
+        "compute_capability": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [{"type": "integer"}, {"type": "integer"}],
+          "type": "array"
+        },
+        "cuda_driver_version": {"minimum": 0, "type": "integer"},
+        "cupy_linked_cuda_runtime_version": {"minimum": 0, "type": "integer"},
+        "cupy_version": {"minLength": 1, "type": "string"},
+        "device_ordinal": {"minimum": 0, "type": "integer"},
+        "device_uuid": {"minLength": 1, "type": "string"},
+        "pci_bus_id": {"minLength": 1, "type": "string"},
+        "environment_identity": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+        "gpu_name": {"minLength": 1, "type": "string"},
+        "local_cuda_runtime_version": {"minimum": 0, "type": ["integer", "null"]},
+        "machine": {"type": "string"},
+        "numpy_version": {"minLength": 1, "type": "string"},
+        "platform_release": {"type": "string"},
+        "platform_system": {"type": "string"},
+        "precision_contract": {
+          "additionalProperties": false,
+          "properties": {
+            "byte_order": {"const": "little"},
+            "dtype": {"const": "float64"}
+          },
+          "required": ["dtype", "byte_order"],
+          "type": "object"
+        },
+        "python_implementation": {"minLength": 1, "type": "string"},
+        "python_version": {"minLength": 1, "type": "string"},
+        "single_gpu": {"const": true},
+        "tf32_or_mixed_precision": {"const": false},
+        "total_global_memory_bytes": {"minimum": 1, "type": "integer"}
+      },
+      "required": [
+        "backend", "device_ordinal", "device_uuid", "pci_bus_id", "gpu_name", "compute_capability",
+        "total_global_memory_bytes", "cuda_driver_version",
+        "cupy_linked_cuda_runtime_version", "local_cuda_runtime_version",
+        "cupy_version", "numpy_version", "python_implementation", "python_version",
+        "platform_system", "platform_release", "machine", "byteorder",
+        "precision_contract", "single_gpu", "tf32_or_mixed_precision",
+        "environment_identity"
+      ],
+      "type": "object"
+    },
+    "schema_version": {"const": "ns-sim-cuda-provenance-lock/1"}
+  },
+  "required": ["schema_version", "environment"],
+  "title": "NS-SIM CUDA Provenance Lock",
+  "type": "object"
+}

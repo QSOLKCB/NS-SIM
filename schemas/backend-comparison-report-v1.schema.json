@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/QSOLKCB/NS-SIM/schemas/backend-comparison-report-v1.schema.json",
+  "title": "NS-SIM CPU CUDA Backend Comparison Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "passed", "numerical_gate_passed", "provenance_complete",
+    "source_revision", "source_revision_usable", "experiment_hash", "comparison_contract_identity",
+    "comparison_contract", "reference_backend", "candidate_backend", "metrics",
+    "reproducibility_classification", "numerical_verification_status", "physical_validation_status"
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "diagnostic": {
+      "type": "object",
+      "required": ["step", "time", "finite_state", "divergence_linf", "divergence_l2", "kinetic_energy_mean", "enstrophy_mean", "pressure_iterations", "pressure_residual_linf"]
+    },
+    "assessment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["absolute_error", "reference_scale", "absolute_tolerance", "relative_tolerance", "effective_threshold", "passed"],
+      "properties": {
+        "absolute_error": {"type": "number", "minimum": 0}, "reference_scale": {"type": "number", "minimum": 0},
+        "absolute_tolerance": {"type": "number", "minimum": 0}, "relative_tolerance": {"type": "number", "minimum": 0},
+        "effective_threshold": {"type": "number", "minimum": 0}, "passed": {"type": "boolean"}
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {"const": "ns-sim-backend-comparison/1"},
+    "passed": {"type": "boolean"}, "numerical_gate_passed": {"type": "boolean"}, "provenance_complete": {"type": "boolean"},
+    "source_revision": {"type": "string", "minLength": 1}, "source_revision_usable": {"type": "boolean"},
+    "experiment_hash": {"$ref": "#/$defs/sha256"}, "comparison_contract_identity": {"$ref": "#/$defs/sha256"},
+    "comparison_contract": {"type": "object"},
+    "reference_backend": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "environment", "final_state_hash", "final_diagnostic"],
+      "properties": {
+        "name": {"const": "cpu-reference-v1"}, "environment": {"type": "object"},
+        "final_state_hash": {"$ref": "#/$defs/sha256"}, "final_diagnostic": {"$ref": "#/$defs/diagnostic"}
+      }
+    },
+    "candidate_backend": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "environment", "provenance_lock", "final_state_hash", "final_diagnostic"],
+      "properties": {
+        "name": {"const": "cuda-single-gpu-v1"}, "environment": {"type": "object"}, "provenance_lock": {"type": "object"},
+        "final_state_hash": {"$ref": "#/$defs/sha256"}, "final_diagnostic": {"$ref": "#/$defs/diagnostic"}
+      }
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "u_linf", "v_linf", "p_linf", "velocity_l2", "divergence_linf_abs_diff",
+        "kinetic_energy_abs_diff", "enstrophy_abs_diff", "pressure_residual_linf_abs_diff"
+      ],
+      "properties": {
+        "u_linf": {"$ref": "#/$defs/assessment"}, "v_linf": {"$ref": "#/$defs/assessment"},
+        "p_linf": {"$ref": "#/$defs/assessment"}, "velocity_l2": {"$ref": "#/$defs/assessment"},
+        "divergence_linf_abs_diff": {"$ref": "#/$defs/assessment"},
+        "kinetic_energy_abs_diff": {"$ref": "#/$defs/assessment"},
+        "enstrophy_abs_diff": {"$ref": "#/$defs/assessment"},
+        "pressure_residual_linf_abs_diff": {"$ref": "#/$defs/assessment"}
+      }
+    },
+    "reproducibility_classification": {
+      "type": "object", "additionalProperties": false, "required": ["R2_status", "R3_status"],
+      "properties": {
+        "R2_status": {"const": "not_assessed"},
+        "R3_status": {"enum": ["demonstrated", "not_demonstrated", "withheld_missing_source_revision"]}
+      }
+    },
+    "numerical_verification_status": {"enum": ["cross_backend_comparison_passed", "cross_backend_comparison_failed"]},
+    "physical_validation_status": {"const": "not_claimed"}
+  }
+}

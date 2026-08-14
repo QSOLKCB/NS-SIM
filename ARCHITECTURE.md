@@ -4,9 +4,9 @@
 
 NS-SIM separates the **scientific contract** from the **execution backend**. The same experiment definition should be interpretable by a canonical reference implementation and by accelerated implementations without allowing backend optimizations to silently redefine the modeled problem.
 
-Phase 1 now implements the first canonical execution path rather than leaving the architecture purely planned.
+Phase 1 implements the canonical CPU execution path, Phase 2 adds numerical-verification evidence infrastructure, and Phase 3 adds a single-GPU CUDA candidate backend plus explicit CPU/CUDA comparison.
 
-## Implemented Phase 1 data flow
+## Implemented reference and accelerated data flow
 
 ```text
 JSON experiment
@@ -19,8 +19,13 @@ strict schema + semantic normalization
       v
 canonical 2D model contract
       |
-      v
-cpu-reference-v1 / NumPy -----> hardware/software provenance
+      +--> cpu-reference-v1 / NumPy ------> CPU provenance
+      |
+      +--> cuda-single-gpu-v1 / CuPy ------> GPU/software provenance lock
+      |                  |
+      |                  +--> R2 repeat evidence
+      |
+      +--> CPU/CUDA metric+tolerance gate --> R3 evidence
       |
       v
 simulation states ------------> .nss checkpoints + hashes
@@ -28,10 +33,10 @@ simulation states ------------> .nss checkpoints + hashes
       +------------------------> diagnostics
       |
       v
-final state + receipt
+final state + receipt/evidence artifact
 ```
 
-The package implementation lives under `src/ns_sim/`; schema artifacts are under `schemas/`; executable experiment examples are under `examples/`; regressions are under `tests/`.
+The package implementation lives under `src/ns_sim/`; schema artifacts are under `schemas/`; executable experiment examples are under `examples/`; verification contracts are under `verification/`; regressions are under `tests/`.
 
 ## Layer model
 
@@ -64,15 +69,17 @@ Owns execution semantics that are independent of a particular accelerator:
 - receipt generation;
 - repeat-execution comparison.
 
-Phase 1 implements these responsibilities in `src/ns_sim/` and fails closed rather than silently coercing unsupported contracts.
+Phase 1 implements these responsibilities in `src/ns_sim/` and fails closed rather than silently coercing unsupported contracts. Phase 3 mirrors the relevant checkpoint and diagnostic semantics in the CUDA candidate path without altering the canonical experiment identity.
 
 ### 3. Backend layer
 
 Implements canonical operations on a declared execution target. Current and planned targets are:
 
-- **implemented:** `cpu-reference-v1`;
-- **future:** CUDA single-GPU acceleration;
+- **implemented canonical reference:** `cpu-reference-v1`;
+- **implemented candidate accelerator:** `cuda-single-gpu-v1`;
 - **future:** multi-GPU/domain-decomposed execution.
+
+`cuda-single-gpu-v1` does not redefine the Phase 1 experiment schema. It consumes the frozen `cpu-reference-v1` experiment contract as a candidate implementation and identifies the actual execution backend in its own run/comparison artifacts. That keeps scientific-contract identity separate from execution-target selection.
 
 A backend may optimize implementation but may not silently change equations, boundary conditions, precision, filters, convergence thresholds, or timestep policy.
 
@@ -82,7 +89,7 @@ Software regressions and invariant checks establish runtime behavior. Numerical 
 
 Physical validation is distinct: it requires comparison to experimental or observational evidence with uncertainty, mapping, metric, acceptance criteria, and scope. Neither regression success nor backend agreement alone is physical validation.
 
-Phase 1 contains runtime regressions only. The Phase 2 verification suite remains future work.
+Phase 2 supplies executable analytic/refinement evidence plus archived non-periodic benchmark gates. Phase 3 adds explicit CPU/CUDA R3 comparison and CUDA R2 repeat evidence paths. Performance reports are downstream of a passing numerical-comparison gate.
 
 ### 5. Derived-output layer
 
@@ -92,14 +99,20 @@ Visualization, sonification, spectra, videos, and other representations are down
 
 The reference/canonical layer must not depend on visualization or sonification. Accelerated backends depend on canonical interfaces, not the reverse. Verification tooling may consume canonical and backend results. Archival tooling may consume every stable artifact but must not alter simulation results.
 
+CUDA support remains an optional dependency. Importing the core package or running CPU-only CI must not require CuPy or a CUDA device.
+
 ## Canonical state
 
 Phase 1 canonical state consists of float64 velocity fields `u`, `v`, gauge-fixed pressure `p`, step/time metadata, and the binding experiment hash.
 
 `ns-sim-state/1` serializes a compact sorted JSON header followed by contiguous little-endian float64 `u`, `v`, and `p` arrays in C order. SHA-256 of the complete byte stream is the canonical state/checkpoint hash.
 
+The CUDA backend copies candidate checkpoint/final arrays back to host and uses the same canonical serializer. This gives CPU and CUDA artifacts a common state-comparison boundary without asserting that their bytes must match.
+
 Derived caches, rendering buffers, audio buffers, UI state, wall-clock timing, and non-semantic logging are excluded from canonical state unless a later contract explicitly promotes them.
 
 ## Failure philosophy
 
-NS-SIM fails closed on malformed or scientifically ambiguous experiment definitions. Unknown configuration fields, unsupported solver combinations, non-finite state, failed pressure convergence, invalid boundary specifications, or violated hard timestep constraints produce explicit run failure rather than a plausible-looking result.
+NS-SIM fails closed on malformed or scientifically ambiguous experiment definitions. Unknown configuration fields, unsupported solver combinations, non-finite state, failed pressure convergence, invalid boundary specifications, violated hard timestep constraints, provenance-lock mismatches, or failed numerical-comparison gates produce explicit failure rather than a plausible-looking result.
+
+Performance measurement is also fail-closed: Phase 3 refuses to publish CPU/CUDA timing evidence when the prerequisite numerical comparison fails.
