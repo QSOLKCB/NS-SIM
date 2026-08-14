@@ -18,6 +18,8 @@
         "cupy_linked_cuda_runtime_version": {"minimum": 0, "type": "integer"},
         "cupy_version": {"minLength": 1, "type": "string"},
         "device_ordinal": {"minimum": 0, "type": "integer"},
+        "device_uuid": {"minLength": 1, "type": "string"},
+        "pci_bus_id": {"minLength": 1, "type": "string"},
         "environment_identity": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
         "gpu_name": {"minLength": 1, "type": "string"},
         "local_cuda_runtime_version": {"minimum": 0, "type": ["integer", "null"]},
@@ -41,7 +43,7 @@
         "total_global_memory_bytes": {"minimum": 1, "type": "integer"}
       },
       "required": [
-        "backend", "device_ordinal", "gpu_name", "compute_capability",
+        "backend", "device_ordinal", "device_uuid", "pci_bus_id", "gpu_name", "compute_capability",
         "total_global_memory_bytes", "cuda_driver_version",
         "cupy_linked_cuda_runtime_version", "local_cuda_runtime_version",
         "cupy_version", "numpy_version", "python_implementation", "python_version",
