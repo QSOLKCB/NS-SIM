@@ -1,0 +1,14 @@
+{
+  "schema_version": "ns-sim-verification-reference/1",
+  "case": "taylor-green-vortex",
+  "source": {
+    "type": "analytic_solution",
+    "description": "Two-dimensional decaying Taylor-Green vortex under the NS-SIM incompressible periodic contract"
+  },
+  "tolerances": {
+    "finest_spatial_velocity_l2_max": 0.0055,
+    "spatial_order_min": 0.9,
+    "temporal_order_min": 0.9
+  },
+  "notes": "Tolerances are repository verification gates, not uncertainty bounds or physical-validation criteria."
+}

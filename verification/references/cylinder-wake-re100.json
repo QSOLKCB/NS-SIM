@@ -1,0 +1,31 @@
+{
+  "schema_version": "ns-sim-verification-reference/1",
+  "case": "cylinder-wake",
+  "source": {
+    "type": "published_numerical_benchmark",
+    "citation": "M. Schaefer and S. Turek, Benchmark computations of laminar flow around a cylinder, Flow Simulation with High-Performance Computers II, Notes on Numerical Fluid Mechanics 52, 547-566 (1996); archived FeatFlow DFG benchmark 2D-2 reference results",
+    "reference_site": "TU Dortmund FeatFlow DFG benchmark 2D-2"
+  },
+  "regime": {
+    "reynolds_number": 100,
+    "domain": [2.2, 0.41],
+    "cylinder_center": [0.2, 0.2],
+    "cylinder_radius": 0.05,
+    "nu": 0.001,
+    "mean_velocity": 1.0,
+    "characteristic_length": 0.1
+  },
+  "metrics": {
+    "strouhal": 0.30188,
+    "cd_mean": 3.1884,
+    "cd_amplitude": 0.06310,
+    "cl_amplitude": 2.008
+  },
+  "tolerances": {
+    "strouhal": 0.02,
+    "cd_mean": 0.15,
+    "cd_amplitude": 0.03,
+    "cl_amplitude": 0.15
+  },
+  "notes": "Reference values use the fine FeatFlow Q2/P1disc periodic benchmark result (level 6, k=1/200 where tabulated). Tolerances are NS-SIM verification gates, not measurement uncertainty. Passing is numerical verification evidence only."
+}

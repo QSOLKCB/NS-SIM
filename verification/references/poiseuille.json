@@ -1,0 +1,14 @@
+{
+  "schema_version": "ns-sim-verification-reference/1",
+  "case": "poiseuille-channel",
+  "source": {
+    "type": "analytic_solution",
+    "description": "Steady plane Poiseuille flow u(y)=a*y*(H-y)/(2*nu) with no-slip walls"
+  },
+  "tolerances": {
+    "profile_linf_max": 1e-12,
+    "wall_slip_linf_max": 0.0,
+    "flow_rate_order_min": 1.9
+  },
+  "notes": "The centered second derivative represents the quadratic profile to roundoff; trapezoidal volume-flow integration supplies a nontrivial second-order refinement observable."
+}
