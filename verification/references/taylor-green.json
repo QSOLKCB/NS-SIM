@@ -1,0 +1,51 @@
+{
+  "schema_version": "ns-sim-verification-reference/1",
+  "case": "taylor-green-vortex",
+  "source": {
+    "type": "analytic_solution",
+    "description": "Two-dimensional unforced decaying Taylor-Green vortex under the NS-SIM incompressible periodic contract"
+  },
+  "regime": {
+    "domain": {"x_length": 6.283185307179586, "y_length": 6.283185307179586, "units": "nondimensional"},
+    "material": {"rho": 1.0, "nu": 0.01, "units": "nondimensional"},
+    "initial_condition": {"type": "taylor_green", "amplitude": 0.1, "mode": 1},
+    "boundary_conditions": {"x": "periodic", "y": "periodic"},
+    "forcing": {
+      "canonical_representation": "specific_body_force_acceleration",
+      "canonical_units": "nondimensional",
+      "canonical_value": [0.0, 0.0]
+    },
+    "discretization": {
+      "name": "finite_difference_projection_v1",
+      "advection": "centered_second_order",
+      "diffusion": "centered_second_order",
+      "divergence_gradient_pair": "backward_forward_v1"
+    },
+    "time_integration": {"name": "forward_euler_projection_v1"},
+    "precision": {"dtype": "float64", "byte_order": "little"},
+    "backend_request": {"name": "cpu-reference-v1"}
+  },
+  "study": {
+    "spatial_levels": [
+      {"n": 16, "dt": 0.000125, "steps": 8},
+      {"n": 24, "dt": 0.000125, "steps": 8},
+      {"n": 32, "dt": 0.000125, "steps": 8}
+    ],
+    "temporal": {
+      "n": 16,
+      "levels": [
+        {"dt": 0.001, "steps": 4},
+        {"dt": 0.0005, "steps": 8},
+        {"dt": 0.00025, "steps": 16}
+      ],
+      "reference_dt": 0.0000625,
+      "reference_steps": 64
+    }
+  },
+  "tolerances": {
+    "finest_spatial_velocity_l2_max": 0.0055,
+    "spatial_order_min": 0.9,
+    "temporal_order_min": 0.9
+  },
+  "notes": "Tolerances are repository verification gates bound to this declared regime and study; they are not uncertainty bounds or physical-validation criteria."
+}

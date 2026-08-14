@@ -1,0 +1,24 @@
+{
+  "schema_version": "ns-sim-verification-reference/1",
+  "case": "poiseuille-channel",
+  "source": {
+    "type": "analytic_solution",
+    "description": "Steady plane Poiseuille flow u(y)=a*y*(H-y)/(2*nu) with no-slip walls"
+  },
+  "regime": {
+    "height": 1.0,
+    "nu": 0.1,
+    "forcing": {
+      "representation": "specific_body_force_acceleration",
+      "units_or_nondimensional_convention": "nondimensional",
+      "value": 1.0
+    }
+  },
+  "study": {"resolutions": [17, 33, 65]},
+  "tolerances": {
+    "profile_linf_max": 1e-12,
+    "wall_slip_linf_max": 0.0,
+    "flow_rate_order_min": 1.9
+  },
+  "notes": "The forcing is explicitly specific body-force acceleration. The centered second derivative represents the quadratic profile to roundoff; trapezoidal volume-flow integration supplies a nontrivial second-order refinement observable."
+}

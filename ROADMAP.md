@@ -28,14 +28,24 @@ The roadmap is directional, not a release promise. Numerical verification and sc
 
 Phase 1 therefore includes minimum numerical-verification evidence for the canonical operator/time-step implementation. It does **not** claim the broader Phase 2 verification programme is complete.
 
-## Phase 2 — Expanded numerical verification suite
+## Phase 2 — Expanded numerical verification suite — implementation in progress
 
-- extend Taylor–Green to systematic grid/time refinement studies and archived tolerances;
-- Poiseuille/channel flow;
-- lid-driven cavity;
-- cylinder wake / vortex shedding;
-- reusable grid/time refinement tooling;
-- archived reference outputs, metrics, and tolerances.
+Implemented:
+
+- systematic Taylor–Green spatial refinement and same-grid temporal self-convergence tooling with archived tolerances;
+- deterministic plane-Poiseuille analytic/no-slip verification with second-order flow-rate refinement;
+- reusable refinement-order, profile-comparison, metric-comparison, and reference-archive tooling;
+- archived Ghia–Ghia–Shin Re=100 lid-driven-cavity centerline reference data and explicit tolerances;
+- archived DFG/FeatFlow Re=100 cylinder-wake force/Strouhal metrics and explicit tolerances;
+- CLI and CI entry points for the executable Phase 2 core and non-periodic candidate benchmark comparison.
+
+Still required before Phase 2 can be called complete:
+
+- an implemented non-periodic wall/obstacle candidate solver contract capable of producing lid-driven-cavity observables;
+- an implemented non-periodic wall/obstacle candidate solver contract capable of producing cylinder-wake force and shedding observables;
+- successful candidate comparisons against the archived cavity and cylinder gates.
+
+The Phase 1 periodic canonical backend is not silently broadened to satisfy these cases. Archived reference gates remain `candidate_required` until a solver with declared boundary/geometry semantics produces the candidate data.
 
 ## Phase 3 — CUDA acceleration
 
