@@ -5,16 +5,22 @@
   "properties": {
     "candidate_backend": {"const": "cuda-single-gpu-v1"},
     "metrics": {
-      "additionalProperties": {
-        "additionalProperties": false,
-        "properties": {
-          "absolute_tolerance": {"minimum": 0, "type": "number"},
-          "relative_tolerance": {"minimum": 0, "type": "number"}
-        },
-        "required": ["absolute_tolerance", "relative_tolerance"],
-        "type": "object"
+      "additionalProperties": false,
+      "properties": {
+        "u_linf": {"$ref": "#/$defs/tolerance"},
+        "v_linf": {"$ref": "#/$defs/tolerance"},
+        "p_linf": {"$ref": "#/$defs/tolerance"},
+        "velocity_l2": {"$ref": "#/$defs/tolerance"},
+        "divergence_linf_abs_diff": {"$ref": "#/$defs/tolerance"},
+        "kinetic_energy_abs_diff": {"$ref": "#/$defs/tolerance"},
+        "enstrophy_abs_diff": {"$ref": "#/$defs/tolerance"},
+        "pressure_residual_linf_abs_diff": {"$ref": "#/$defs/tolerance"}
       },
-      "minProperties": 1,
+      "required": [
+        "u_linf", "v_linf", "p_linf", "velocity_l2",
+        "divergence_linf_abs_diff", "kinetic_energy_abs_diff",
+        "enstrophy_abs_diff", "pressure_residual_linf_abs_diff"
+      ],
       "type": "object"
     },
     "notes": {"minLength": 1, "type": "string"},
@@ -29,12 +35,44 @@
     },
     "reference_backend": {"const": "cpu-reference-v1"},
     "schema_version": {"const": "ns-sim-backend-comparison-contract/1"},
-    "scope": {"type": "object"}
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary_conditions": {
+          "additionalProperties": false,
+          "properties": {"x": {"const": "periodic"}, "y": {"const": "periodic"}},
+          "required": ["x", "y"],
+          "type": "object"
+        },
+        "comparison_kind": {"const": "single-experiment final-state and final-diagnostic R3 gate"},
+        "discretization": {"const": "finite_difference_projection_v1"},
+        "model": {"const": "incompressible-navier-stokes-2d"},
+        "model_version": {"const": "1"},
+        "pressure_solver": {"const": "jacobi_periodic_v1"},
+        "time_integration": {"const": "forward_euler_projection_v1"}
+      },
+      "required": [
+        "boundary_conditions", "comparison_kind", "discretization", "model",
+        "model_version", "pressure_solver", "time_integration"
+      ],
+      "type": "object"
+    }
   },
   "required": [
     "schema_version", "reference_backend", "candidate_backend",
     "precision", "scope", "metrics", "notes"
   ],
+  "$defs": {
+    "tolerance": {
+      "additionalProperties": false,
+      "properties": {
+        "absolute_tolerance": {"minimum": 0, "type": "number"},
+        "relative_tolerance": {"minimum": 0, "type": "number"}
+      },
+      "required": ["absolute_tolerance", "relative_tolerance"],
+      "type": "object"
+    }
+  },
   "title": "NS-SIM Backend Comparison Contract",
   "type": "object"
 }
