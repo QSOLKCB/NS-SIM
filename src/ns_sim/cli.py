@@ -35,11 +35,18 @@ def _parser() -> argparse.ArgumentParser:
 
     phase2 = sub.add_parser("verify-phase2", help="run the executable Phase 2 numerical-verification core")
     phase2.add_argument("experiment", help="Taylor-Green-compatible canonical experiment used as the base contract")
-    phase2.add_argument("--references", default="verification/references", help="archived reference directory")
+    phase2.add_argument(
+        "--references",
+        required=True,
+        help="archived reference directory (required; no cwd-dependent implicit default)",
+    )
     phase2.add_argument("--output", help="optional JSON report path")
 
-    benchmark = sub.add_parser("verify-benchmark", help="compare a non-periodic benchmark candidate to an archived reference")
-    benchmark.add_argument("candidate", help="candidate JSON containing benchmark observables")
+    benchmark = sub.add_parser(
+        "verify-benchmark",
+        help="compare a non-periodic benchmark candidate to an archived reference",
+    )
+    benchmark.add_argument("candidate", help="candidate JSON containing benchmark contract and observables")
     benchmark.add_argument("reference", help="archived reference JSON")
     benchmark.add_argument("--output", help="optional JSON assessment path")
     return parser
@@ -75,6 +82,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if report["passed"] else 3
         if args.command == "verify-benchmark":
             candidate = json.loads(Path(args.candidate).read_text(encoding="utf-8"))
+            if not isinstance(candidate, dict):
+                raise ValueError("benchmark candidate must be a JSON object")
             reference = load_reference(args.reference)
             if reference["case"] == "lid-driven-cavity":
                 report = evaluate_lid_driven_cavity(candidate, reference)
